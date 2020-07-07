@@ -605,12 +605,12 @@ class RemarkableIndex:
       raise RemarkableSourceError("The file source '%s' is read-only" % self.fsource.name)
     uid = self._newUid()
     print(uid)
-    meta = PDF_BASE_METADATA
+    meta = PDF_BASE_METADATA.copy()
     meta.setdefault('visibleName', os.path.splitext(os.path.basename(pdf))[0])
     meta.setdefault('lastModified', str(arrow.utcnow().timestamp * 1000))
     meta.update(metadata)
 
-    cont = PDF_BASE_CONTENT
+    cont = PDF_BASE_CONTENT.copy()
     cont.update(content)
 
     try:
