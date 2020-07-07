@@ -1,6 +1,6 @@
-# Remy, a reMarkable tablet manager app
+# reMy, a reMarkable tablet manager app
 
-The goal of Remy is to allow simple interaction with the reMarkable tablet over ssh, without needing the cloud service, nor the USB Web UI.
+The goal of reMy is to allow simple interaction with the reMarkable tablet over ssh, without needing the cloud service, nor the USB Web UI.
 
 
 **BEWARE**
@@ -27,8 +27,8 @@ Requires:
 
 - arrow==0.15.6
 - paramiko==2.7.1
+- PyPDF2==1.26.0
 - PyQt5==5.14.2
-- python-poppler==0.2.1
 - python-poppler-qt5==0.75.0
 - simplification==0.5.1
 
