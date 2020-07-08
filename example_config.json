@@ -1,0 +1,38 @@
+{
+  "default_source": "backup",
+  "sources": {
+    "slow-usb": {
+      "name": "reMarkable (USB-SSH)",
+      "type": "ssh",
+      "address": "10.11.99.1",
+      "key": "~/.ssh/id_rsa",
+      "username": "root",
+      "timeout": 3,
+      "use_banner": "remy-banner.png",
+    },
+    "wifi": {
+      "name": "reMarkable (RSync)",
+      "type": "rsync",
+      "data_dir": "/Users/bordaigorl/remy",
+      "address": "192.168.1.111",
+      "host": "remarkable",
+      "key": "~/.ssh/id_rsa",
+      "username": "root",
+      "timeout": 3,
+      "use_banner": "remy-banner.png"
+    },
+    "backup": {
+      "name": "Latest Backup",
+      "type": "local",
+      "documents": "/Users/bordaigorl/rmbackup/latest",
+      "templates": "/Users/bordaigorl/rmbackup/templates"
+    }
+  },
+  "preview": {
+    "eraser_mode": "accurate"
+  },
+  "export": {
+    "default_dir": "/Users/bordaigorl/Documents",
+    "open_exported": true
+  }
+}

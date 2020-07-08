@@ -38,7 +38,7 @@ The main intended usage is as a GUI for connecting to the tablet.
 The app however also supports reading from a local backup.
 The main entry point for the app is `remygui.py`.
 
-### Configuration
+## Configuration
 
 Starting it the fist time with `python remygui.py` will print an error message with the path where the app is expecting to find a configuration file (on macOS it would be something like `/Users/<user>/Library/Preferences/remy.json`).
 Create a JSON file at that path with the following structure:
@@ -51,20 +51,18 @@ Create a JSON file at that path with the following structure:
       ...
   },
   "default_source": "source1",
-  "export": {
-    "default_dir": "...",
-    "open_exported": true
-  },
-  "mathpix" : {
-    "app_id":"xxx_xxx_xxx_xxx_xxxxxx",
-    "app_key":"xxxxxxxxxxxxxxxxxxxx"
-  }
+  "preview": {...},
+  "export": {...},
+  "mathpix" : {...}
 }
 ```
 
-To use the mathpix API you need to obtain personal keys at https://mathpix.com/ocr (they have a free plan).
-
 The only mandatory section is `sources`.
+Each section is documented below.
+The file `example_config.json` is an example configuration that you can adapt to your needs.
+**IMPORTANT**: the format is vanilla JSON; trailing commas and C-like comments are **not supported**. The file is parsed using Python's standard `json` module.
+
+### Source types
 Each source defines a possible way to get the contents to display.
 There are three supported kinds of sources: `local`, `ssh` and `rsync`.
 
@@ -135,11 +133,51 @@ The data-heavy files (PDFs and .rm) are downloaded on demand.
 
 When this option is set, the main UI of the tabled will be temporarily disabled while reMy is open.
 This is intended as an helpful prompt and a way to avoid conflicts on data access.
-The feature works best if the setting is the filename of a png file stored on the tablet (there's a nice `remy-banner.png` in the asset folders you can upload with `scp`) and [`remarkable-splash`](https://github.com/ddvk/remarkable-splash) is installed on the tablet.
+The feature works best if the setting is the filename (can be absolute, or relative to home) of a png file stored on the tablet (there's a nice `remy-banner.png` in the asset folders you can upload with `scp`) and [`remarkable-splash`](https://github.com/ddvk/remarkable-splash) is installed on the tablet.
 
 If reMy crashes and the remarkable seems unresponsive it is only because reMy re-enables the main UI of the tabled on exit; to regain control of the tablet you have three options: try and run reMy again and close it cleanly; or run `ssh REMARKABLEHOST /bin/systemctl start xochitl`; or manually reboot the device. Don't worry nothing bad is happening to the tablet in this circumstance.
 
-### Features
+### Preview options
+
+The `preview` section for now has one option only: `eraser_mode`.
+It can take two values: `"accurate"` or `"quick"` (default is `"quick"`).
+The quick method paints white strokes to render the eraser tool.
+This results in quicker rendering times but inaccurate results: the layers below the strokes would be covered by the eraser which is undesirable.
+The export function always uses the accurate method: clipping the paths to exclude erased areas. Accurate mode is slower to render due to the clipping, so it is optional in preview mode.
+
+```json
+"preview": {
+  "eraser_mode": "quick"
+}
+```
+### Export options
+
+The export section has two settings:
+
+```json
+"export": {
+  "default_dir": "...",
+  "open_exported": true
+}
+```
+
+### Mathpix options
+
+To use the mathpix API you need to obtain personal tokens at https://mathpix.com/ocr (they have a free plan).
+Once obtained, the API tokens should be saved in the configuration as follows:
+
+```json
+"mathpix" : {
+  "app_id":"xxx_xxx_xxx_xxx_xxxxxx",
+  "app_key":"xxxxxxxxxxxxxxxxxxxx"
+}
+```
+
+The support for mathpix is currently experimental.
+Only one page at a time can be exported (via context menu in preview) and the data is sent in vector form, which means the eraser tool is ignored.
+
+
+## Features
 
 Once the configuration file contains the necessary info, you can run reMy by running
 
@@ -150,14 +188,14 @@ With no option, the default source will be selected.
 
 The app displays the tree of the files in the main window.
 
-#### Preview
+### Preview
 
 Double clicking on a PDF or notebook will open a preview window.
 Use the arrows to got to next/prev page. You can zoom in and out with + and - or mouse wheel. Ctrl+Left/Right rotates the view. The context menu shows some further actions.
 Pressing S increases the simplification of the lines, Shift+S decreases it (this is only a rendering effect, the notebooks are unaffected). This is just a preview of an experimental feature.
 
 
-#### Export and rendering
+### Export and rendering
 
 PDFs are rendered at a fixed resolution for quick preview.
 The export function overlays the vectorial data from annotations to the original PDF so the quality of both is preserved.
@@ -169,7 +207,7 @@ This will become a fully customizable parameter once the tool matures.
 
 Planned features include: fully parametric rendering to be able to control the colors/style of each element from settings.
 
-#### Upload
+### Upload
 
 From the tree view, select a folder (or deselect to select the root) and drag and drop on the info panel any PDF (mutiple PDFs at once are supported, folders are planned but not supported yet).
 For the moment, the UI blocks until upload is completed.
