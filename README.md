@@ -64,6 +64,8 @@ The file `example_config.json` is an example configuration that you can adapt to
 
 ### Source types
 Each source defines a possible way to get the contents to display.
+The `default_source` settings indicates which source to load if none is specified in the command line.
+If `default_source` is `false` or not set, then reMy shows a dialog allowing you to pick a source among the available ones.
 There are three supported kinds of sources: `local`, `ssh` and `rsync`.
 
 #### Local source

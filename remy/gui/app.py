@@ -50,10 +50,16 @@ def main():
     sys.exit(1)
   log.info("Configuration loaded from '%s'.", confpath)
 
+  sources = config.get('sources', [])
+
   if source is None:
     source = config.get('default_source')
+    if not source:
+      source, ok = QInputDialog.getItem(None, "Source selection", "Source:", list(sorted(sources)), editable=False)
+      if not ok:
+        log.error("Sorry, I need a source to work.")
+        sys.exit()
 
-  sources = config.get('sources', [])
   if source not in sources:
     log.fatal("Invalid source %s (available: %s)", source, ', '.join(sources))
     sys.exit(1)
