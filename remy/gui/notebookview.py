@@ -443,12 +443,12 @@ class NotebookViewer(QGraphicsView):
         # self.leftMouseButtonDoubleClicked.emit(scenePos.x(), scenePos.y())
     # elif event.button() == Qt.RightButton:
         # self.rightMouseButtonDoubleClicked.emit(scenePos.x(), scenePos.y())
-    QGraphicsView.mouseDoubleClickEvent(self, event)
+    # super(NotebookViewer, self).mouseDoubleClickEvent(event)
 
 
   def wheelEvent(self, event):
     if event.modifiers() == Qt.NoModifier:
-      QGraphicsView.wheelEvent(self, event)
+      QAbstractScrollArea.wheelEvent(self, event)
     else:
       self._fit = False
 
