@@ -295,7 +295,7 @@ PDF_BASE_CONTENT  = {
     "lineHeight": -1,
     "margins": 100,
     "orientation": "portrait",
-    "pageCount": 0,
+    # "pageCount": 0,
     "textAlignment": "left",
     "textScale": 1,
     "transform": {
@@ -614,10 +614,6 @@ class RemarkableIndex:
     cont.update(content)
 
     try:
-
-      from popplerqt5 import Poppler
-      doc = Poppler.Document.load(pdf)
-      cont['pageCount'] = doc.numPages()
 
       self.fsource.upload(pdf, uid + '.pdf')
       self.fsource.store(meta, uid + '.metadata')
