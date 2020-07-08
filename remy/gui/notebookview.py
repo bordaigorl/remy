@@ -10,6 +10,7 @@ from remy.ocr.mathpix import mathpix
 
 from os import path
 
+import time
 import logging
 log = logging.getLogger('remy')
 
@@ -108,6 +109,7 @@ class NotebookViewer(QGraphicsView):
     # self.setAttribute(Qt.WA_OpaquePaintEvent, True)
 
     self.document = document
+    self.options = QApplication.instance().config.get('preview', {})
     # document.prefetch()
     # self.uid = uid
 
@@ -257,18 +259,29 @@ class NotebookViewer(QGraphicsView):
 
 
     for l in page.layers:
-      group = QGraphicsPathItem(r)
-      # group.setFlag(QGraphicsItem.ItemClipsChildrenToShape)
-      # group.setBrush(QBrush())
+      group = QGraphicsPathItem()
       group.setPen(noPen)
 
       for k in l.strokes:
         calcwidth = dynamic_width
-        if (k.pen == 2 or k.pen == 15):
+        if k.pen == 0 or k.pen == 12:
+          #### BRUSH             ####
+          pen.setColor(colors[k.color])
+        elif (k.pen == 1 or k.pen == 14):
+          #### PENCIL            ####
+          c = QColor(colors[k.color])
+          c.setAlpha(180)
+          pbrush.setColor(c)
+          pen.setBrush(pbrush)
+        elif (k.pen == 2 or k.pen == 15):
           #### BALLPOINT         ####
           pen.setColor(colors[k.color])
           calcwidth = very_dynamic_width
           # pen.setWidth(2)
+        elif (k.pen == 3 or k.pen == 16):
+          #### MARKER            ####
+          pen.setColor(colors[k.color])
+          calcwidth = bold_dynamic_width
         elif (k.pen == 4 or k.pen == 17):
           #### FINELINER         ####
           pen.setColor(colors[k.color])
@@ -286,23 +299,11 @@ class NotebookViewer(QGraphicsView):
           pen.setColor(colors[k.color])
           pen.setBrush(pbrush)
           calcwidth = flat_width
-        elif (k.pen == 3 or k.pen == 16):
-          #### MARKER            ####
-          pen.setColor(colors[k.color])
-          calcwidth = bold_dynamic_width
-        elif (k.pen == 1 or k.pen == 14):
-          #### PENCIL            ####
-          c = QColor(colors[k.color])
-          c.setAlpha(180)
-          pbrush.setColor(c)
-          pen.setBrush(pbrush)
         elif k.pen == 8:
           #### ERASE AREA        ####
           # pen.setColor(Qt.white)
-          calcwidth = const_width(0)
-        elif k.pen == 0 or k.pen == 12:
-          #### BRUSH             ####
-          pen.setColor(colors[k.color])
+          # calcwidth = const_width(0)
+          pass
         else:
           log.warning("Unknown pen code %d" % k.pen)
           pen.setColor(Qt.red)
@@ -311,31 +312,48 @@ class NotebookViewer(QGraphicsView):
 
         if k.pen == 8:
           # ERASE AREA
-          area = QPainterPath(QPointF(k.segments[0].x, k.segments[0].y))
-          area.setFillRule(Qt.WindingFill)
-          for s in k.segments[1:]:
-            area.lineTo(s.x,s.y)
-          area = fullPageClip.subtracted(area)
-          group.setFlag(QGraphicsItem.ItemClipsChildrenToShape)
-          group.setPath(area)
+          # The remarkable renderer seems to ignore these!
+          # area = QPainterPath(QPointF(k.segments[0].x, k.segments[0].y))
+          # area.setFillRule(Qt.WindingFill)
+          # for s in k.segments[1:]:
+          #   area.lineTo(s.x,s.y)
+          # area = fullPageClip.subtracted(area)
+          # group.setFlag(QGraphicsItem.ItemClipsChildrenToShape)
+          # group.setPath(area)
 
-          group = QGraphicsPathItem(r)
-          # group.setBrush(QBrush())
-          group.setPen(noPen)
+          # newgroup = QGraphicsPathItem(r)
+          # newgroup.setPen(noPen)
+          # group.setParentItem(newgroup)
+          # group = newgroup
+          pass
         elif k.pen == 6 and fancyEraser:
           # ERASER
+          T1 = time.perf_counter()
           eraserStroker.setWidth(k.width)
-          area = QPainterPath(QPointF(k.segments[0].x, k.segments[0].y))
+          area = QPainterPath(QPointF(0,0))
+          area.moveTo(0,0)
+          area.lineTo(0,rm.HEIGHT)
+          area.lineTo(rm.WIDTH,rm.HEIGHT)
+          area.lineTo(rm.WIDTH,0)
+          area.lineTo(0,0)
+          subarea = QPainterPath(QPointF(k.segments[0].x, k.segments[0].y))
           for s in k.segments[1:]:
-            area.lineTo(s.x,s.y)
-          area = eraserStroker.createStroke(area)
-          area = fullPageClip.subtracted(area)
+            subarea.lineTo(s.x,s.y)
+          subarea = eraserStroker.createStroke(subarea)
+          log.debug('A: %f', time.perf_counter() - T1); T1 = time.perf_counter()
+          subarea = subarea.simplified()  # this is expensive
+          # area = fullPageClip.subtracted(subarea)  # this alternative is also expensive
+          area.addPath(subarea)
           group.setFlag(QGraphicsItem.ItemClipsChildrenToShape)
           group.setPath(area)
-
-          group = QGraphicsPathItem(r)
-          # group.setBrush(QBrush())
-          group.setPen(noPen)
+          ### good for testing:
+          # group.setPen(Qt.red)
+          # group.setBrush(QBrush(QColor(255,0,0,50)))
+          log.debug('B: %f', time.perf_counter() - T1); T1 = time.perf_counter()
+          newgroup = QGraphicsPathItem()
+          newgroup.setPen(noPen)
+          group.setParentItem(newgroup)
+          group = newgroup
         else:
           if simplify > 0 and (k.pen == 4 or k.pen == 17):
             # SIMPLIFIED (Test)
@@ -389,7 +407,8 @@ class NotebookViewer(QGraphicsView):
         # pen.setWidth(k.width)
         # item.setPen(pen)
 
-      group.setPath(fullPageClip)
+      # group.setPath(fullPageClip)
+      group.setParentItem(r)
 
     if forViewing:
       r=scene.addRect(0,0,rm.WIDTH, rm.HEIGHT)
@@ -397,11 +416,14 @@ class NotebookViewer(QGraphicsView):
     return scene
 
   def loadPage(self, i):
+    T0 = time.perf_counter()
+    fancy = self.options.get('eraser_mode') == "accurate"
     if i not in self._page_cache:
-      self._page_cache[i] = self.makePageScene(i)
+      self._page_cache[i] = self.makePageScene(i, fancyEraser=fancy)
     self.setScene(self._page_cache[i])
     self._page = i
     self.refreshTitle()
+    log.debug('LOAD PAGE %d: %f', i, time.perf_counter() - T0)
 
   def resetSize(self, ratio):
     dg = QApplication.desktop().availableGeometry(self)
