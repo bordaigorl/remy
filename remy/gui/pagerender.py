@@ -40,19 +40,34 @@ def _progress(p, i, t):
 DEFAULT_COLORS = [Qt.black, Qt.gray, Qt.white]
 DEFAULT_HIGHLIGHT = QColor(255,235,147, 80)
 
+QUICK_ERASER    = 0
+IGNORE_ERASER   = 1
+ACCURATE_ERASER = 2
+
+ERASER_MODE = {
+  "quick": QUICK_ERASER,
+  "ignore": IGNORE_ERASER,
+  "accurate": ACCURATE_ERASER,
+}
+
+
 class PageGraphicsItem(QGraphicsRectItem):
 
   def __init__(
       self,
       page,
+      scene=None,
       colors=DEFAULT_COLORS,
       highlight=DEFAULT_HIGHLIGHT,
       simplify=0,
-      fancyEraser=True,
+      eraserMode=ACCURATE_ERASER,
       parent=None,
       progress=None,
   ):
     super().__init__(0,0,rm.WIDTH,rm.HEIGHT,parent)
+
+    if isinstance(eraserMode, str):
+      eraserMode = ERASER_MODE.get(eraserMode, ACCURATE_ERASER)
 
     noPen = QPen(Qt.NoPen)
     noPen.setWidth(0)
@@ -123,7 +138,9 @@ class PageGraphicsItem(QGraphicsRectItem):
           # ERASE AREA
           # The remarkable renderer seems to ignore these!
           pass
-        elif k.pen == 6 and fancyEraser:
+        elif k.pen == 6 and eraserMode == IGNORE_ERASER:
+          pass
+        elif k.pen == 6 and eraserMode == ACCURATE_ERASER:
           # ERASER
           T1 = time.perf_counter()
           eraserStroker.setWidth(k.width)

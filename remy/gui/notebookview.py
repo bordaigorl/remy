@@ -131,7 +131,7 @@ class NotebookViewer(QGraphicsView):
         return None
     return self._templates[bg.name]
 
-  def makePageScene(self, i, forViewing=True, simplify=0, fancyEraser=False):
+  def makePageScene(self, i, forViewing=True, simplify=0, eraserMode="ignore"):
     page = self.document.getPage(i)
     scene = QGraphicsScene()
     r = scene.addRect(0,0,rm.WIDTH, rm.HEIGHT)
@@ -156,7 +156,7 @@ class NotebookViewer(QGraphicsView):
       scene.baseItem = None
     # except Exception as e:
       # print("Too bad, can't open background %s" % e)
-    PageGraphicsItem(page, simplify=simplify, fancyEraser=fancyEraser, parent=r)
+    PageGraphicsItem(page, scene=scene, simplify=simplify, eraserMode=eraserMode, parent=r)
     scene.setSceneRect(r.rect())
     if forViewing:
       r=scene.addRect(0,0,rm.WIDTH, rm.HEIGHT)
@@ -165,9 +165,9 @@ class NotebookViewer(QGraphicsView):
 
   def loadPage(self, i):
     T0 = time.perf_counter()
-    fancy = self.options.get('eraser_mode') == "accurate"
+    ermode = self.options.get("eraser_mode")
     if i not in self._page_cache:
-      self._page_cache[i] = self.makePageScene(i, fancyEraser=fancy)
+      self._page_cache[i] = self.makePageScene(i, eraserMode=ermode)
     self.setScene(self._page_cache[i])
     self._page = i
     self.refreshTitle()
@@ -279,7 +279,7 @@ class NotebookViewer(QGraphicsView):
       filename = path.join(opt.get("default_dir", ""), filename)
       filename, ok = QFileDialog.getSaveFileName(self, "Export PDF...", filename)
     if ok and filename:
-      scenes = [self.makePageScene(i, forViewing=False, simplify=.8, fancyEraser=True) for i in range(self._maxPage+1)]
+      scenes = [self.makePageScene(i, forViewing=False, simplify=.8, eraserMode="accurate") for i in range(self._maxPage+1)]
       scenesPdf(scenes, filename)
       if isinstance(self.document, PDFDoc):
         pdfmerge(scenes, self.document.retrieveBaseDocument(), filename)
