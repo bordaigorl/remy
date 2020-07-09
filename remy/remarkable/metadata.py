@@ -69,7 +69,7 @@ class Entry:
     try:
       updated = arrow.get(int(self.lastModified)/1000).humanize()
     except Exception as e:
-      updated = self.lastModified()
+      updated = self.lastModified or "Unknown"
     return updated
 
   def get(self, field, default=None, where=BOTH):
@@ -543,7 +543,7 @@ class RemarkableIndex:
     try:
       updated = arrow.get(int(self.lastModifiedOf(uid))/1000).humanize()
     except Exception as e:
-      updated = self.lastModifiedOf(uid)
+      updated = self.lastModifiedOf(uid) or "Unknown"
     return updated
 
   def nameOf(self, uid):
