@@ -358,10 +358,10 @@ class RemarkableIndex:
     with open(fname) as f:
       return json.load(f)
 
-  NOP = 0
-  ADD = 1
-  DEL = 2
-  UPD = 3
+  NOP = 0 # for acks
+  ADD = 1 # adding an item (listener should consider updating parent)
+  DEL = 2 # removing item (listener should consider updating parent)
+  UPD = 3 # updating metadata of item
 
   def listen(self, f):
     if not callable(f):
@@ -621,7 +621,8 @@ class RemarkableIndex:
       self.fsource.store('', uid + '.pagedata')
       self.fsource.makeDir(uid)
 
-      self.index[uid] = PDFDoc(self.fsource, uid, meta, cont)
+      self.index[uid] = d = PDFDoc(self.fsource, uid, meta, cont)
+      self.index[d.parent].files.append(uid)
 
       self._broadcast(action=self.ADD, entries=[uid])
 
