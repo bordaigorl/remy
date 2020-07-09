@@ -55,7 +55,11 @@ def main():
   if source is None:
     source = config.get('default_source')
     if not source:
-      source, ok = QInputDialog.getItem(None, "Source selection", "Source:", list(sorted(sources)), editable=False)
+      source, ok = QInputDialog.getItem(
+        None, "Source selection", "Source:",
+        [s for s in sorted(sources) if not s.get("hidden", False)],
+        editable=False,
+      )
       if not ok:
         log.error("Sorry, I need a source to work.")
         sys.exit()
