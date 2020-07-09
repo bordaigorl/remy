@@ -149,8 +149,6 @@ class InfoPanel(QWidget):
     tf.setPointSize(30)
     title.setFont(tf)
     details = self.details = QFormLayout()
-    details.addRow("Updated:", QLabel("yesterday"))
-    details.addRow("Updated:", QLabel("yesterday"))
     layout.addWidget(icon)
     layout.addWidget(title)
     layout.addLayout(details)
@@ -196,8 +194,13 @@ class InfoPanel(QWidget):
       self.details.addRow("%d" % len(entry.files), QLabel("Files"))
     elif isinstance(entry, Document):
       self.details.addRow("Updated", QLabel(entry.updatedOn()))
-      self.details.addRow("Pages", QLabel("%d" % entry.pageCount))
-      self.details.addRow("UID", QLabel(entry.uid))
+      if entry.pageCount:
+        self.details.addRow("Pages", QLabel("%d" % entry.pageCount))
+      uidlbl = QLabel(entry.uid)
+      uidlbl.setMinimumSize(100, uidlbl.minimumSize().height())
+      # uidlbl.setWordWrap(True)
+      uidlbl.setTextInteractionFlags(Qt.TextSelectableByMouse | Qt.TextSelectableByKeyboard)
+      self.details.addRow("UID", uidlbl)
 
     # ICONS & TITLE
     if isinstance(entry, RootFolder):
