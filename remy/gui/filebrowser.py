@@ -186,6 +186,8 @@ class InfoPanel(QWidget):
       self.details.removeRow(0)
 
   def setEntry(self, entry):
+    if not isinstance(entry, Entry):
+      entry = self.index.get(entry)
     self.entry = entry
     self._resetDetails()
     # DETAILS
@@ -331,18 +333,10 @@ class DocTree(QTreeWidget):
     self.sortItems(0, Qt.AscendingOrder)
     self.resizeColumnToContents(2)
 
-  # def entry(self, index):
-  #   if index.isValid():
-  #     if self.rmodel.isTrash(index):
-  #        return self.rmIndex().trash
-  #     return self.rmIndex().get(index.internalPointer())
-  #   return None
-
-  # def rmIndex(self):
-  #   return self.rmodel.rmIndex()
-
-  # def isTrash(self, index):
-  #   return self.rmodel.isTrash(index)
+  def itemOf(self, uid):
+    if isinstance(uid, Entry):
+      uid = uid.uid
+    return self._nodes.get(uid)
 
   def mouseReleaseEvent(self, event):
     i = self.indexAt(event.pos())
@@ -414,6 +408,11 @@ class FileBrowser(QMainWindow):
       log.info("Uploading %s to %s", pdf, e.visibleName if e else "root")
       uid = self.index.newPDFDoc(pdf, metadata={'parent': p})
       log.info("Saved %s as %s", pdf, uid)
+    i = self.tree.itemOf(uid)
+    self.tree.scrollToItem(i)
+    self.tree.setCurrentItem(i) #, 0, QItemSelectionModel.ClearAndSelect)
+    self.info.setEntry(uid)
+
 
   @pyqtSlot()
   def selClear(self):
