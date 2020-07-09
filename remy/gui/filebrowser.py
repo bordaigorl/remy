@@ -359,6 +359,7 @@ class DocTree(QTreeWidget):
         pass
     else:
       log.error(str(extra['reason']))
+      QMessageBox.critical(self, "Error", "Something went wrong:\n\n" % e)
 
 
 
