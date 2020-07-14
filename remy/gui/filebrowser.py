@@ -402,6 +402,8 @@ class FileBrowser(QMainWindow):
     fg.moveCenter(dg.center())
     self.move(fg.topLeft())
 
+    splitter.setStretchFactor(0,1.5)
+
   @pyqtSlot(str, list,list)
   def _import(self, p, dirs, files):
     e = self.index.get(p)
