@@ -50,14 +50,14 @@ def main():
     sys.exit(1)
   log.info("Configuration loaded from '%s'.", confpath)
 
-  sources = config.get('sources', [])
+  sources = config.get('sources', {})
 
   if source is None:
     source = config.get('default_source')
     if not source:
       source, ok = QInputDialog.getItem(
         None, "Source selection", "Source:",
-        [s for s in sorted(sources) if not s.get("hidden", False)],
+        [s for s in sorted(sources) if not sources[s].get("hidden", False)],
         editable=False,
       )
       if not ok:
