@@ -9,6 +9,23 @@ import remy.remarkable.constants as rm
 
 from PyPDF2 import PdfFileReader, PdfFileWriter
 from PyPDF2.pdf import PageObject
+from PyPDF2.utils import PdfReadError
+from PyPDF2.generic import NullObject
+
+
+
+class TolerantPdfWriter(PdfFileWriter):
+# This is needed to make the PDF exporter more tolerant to errors in PDFs.
+# pdftk may leave some orphan obj references for example
+# and that would make the writer choke.
+# Instead here we tolerate such missing refs and just produce empty objects for them
+
+  def _sweepIndirectReferences(self, externMap, data):
+    try:
+      return super(TolerantPdfWriter, self)._sweepIndirectReferences(externMap, data)
+    except PdfReadError:
+     return NullObject()
+
 
 import logging
 log = logging.getLogger('remy')
@@ -40,7 +57,7 @@ def pdfmerge(scenes, basePath, outputPath, progress=None):
   baseReader = PdfFileReader(basePath, strict=False)
   pageNum = min(baseReader.getNumPages(), len(scenes))
 
-  writer = PdfFileWriter()
+  writer = TolerantPdfWriter()
   annotReader = PdfFileReader(outputPath, strict=False)
   _progress(progress, 0, pageNum + 1)
   for page in range(pageNum):
