@@ -259,6 +259,7 @@ class PDFDoc(Document):
       self._pdf = Poppler.Document.load(doc)
       self._pdf.setRenderHint(Poppler.Document.Antialiasing)
       self._pdf.setRenderHint(Poppler.Document.TextAntialiasing)
+      self._pdf.setRenderHint(Poppler.Document.HideAnnotations)
     return self._pdf
 
   def baseDocumentName(self):
