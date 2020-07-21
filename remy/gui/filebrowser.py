@@ -406,10 +406,11 @@ class FileBrowser(QMainWindow):
 
   @pyqtSlot(str, list,list)
   def _import(self, p, dirs, files):
+    cont = QApplication.instance().config.get("import",{}).get("default_options",{})
     e = self.index.get(p)
     for pdf in files:
       log.info("Uploading %s to %s", pdf, e.visibleName if e else "root")
-      uid = self.index.newPDFDoc(pdf, metadata={'parent': p})
+      uid = self.index.newPDFDoc(pdf, metadata={'parent': p}, content=cont)
       log.info("Saved %s as %s", pdf, uid)
     i = self.tree.itemOf(uid)
     self.tree.scrollToItem(i)
