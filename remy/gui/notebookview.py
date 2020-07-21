@@ -279,7 +279,11 @@ class NotebookViewer(QGraphicsView):
       filename = path.join(opt.get("default_dir", ""), filename)
       filename, ok = QFileDialog.getSaveFileName(self, "Export PDF...", filename)
     if ok and filename:
-      scenes = [self.makePageScene(i, forViewing=False, simplify=.8, eraserMode="accurate") for i in range(self._maxPage+1)]
+      ropt = {
+        "simplify": opt.get("simplify", 0),
+        "eraserMode": opt.get("eraserMode", "accurate")
+      } # this will be properly generalised at some point
+      scenes = [self.makePageScene(i, forViewing=False, **ropt) for i in range(self._maxPage+1)]
       scenesPdf(scenes, filename)
       if isinstance(self.document, PDFDoc):
         pdfmerge(scenes, self.document.retrieveBaseDocument(), filename)
