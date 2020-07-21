@@ -87,6 +87,7 @@ def pdfmerge(scenes, basePath, outputPath, progress=None):
     writer.addPage(np)
     _progress(progress, page, pageNum + 1)
 
+  writer.removeLinks() # until we implement transformations on annotations
   with open(outputPath, 'wb') as out:
     writer.write(out)
 
