@@ -223,3 +223,30 @@ class ExportOperation(QObject):
   def onSuccess(self):
     self.dialog.setValue(self.dialog.maximum())
     self.success.emit()
+
+
+
+
+class WebUIExport(QObject):
+  # TODO make asynchronous + progress dialog
+
+  def run(self, filename, uid, webUIUrl="10.11.99.1"):
+    import requests
+    # Credit: https://github.com/LinusCDE/rmWebUiTools
+    response = requests.get(
+      "http://{webUIUrl}/download/{uid}/placeholder".format(
+        webUIUrl=webUIUrl, uid=uid
+      ),
+      stream=True,
+    )
+
+    if not response.ok:
+      raise Exception("Download from WebUI failed")
+
+    response.raw.decode_content = True  # Decompress if needed
+    with open(filename, "wb") as out:
+      for chunk in response.iter_content(8192):
+        out.write(chunk)
+
+
+

@@ -9,7 +9,7 @@ import remy.remarkable.constants as rm
 from remy.ocr.mathpix import mathpix
 
 from remy.gui.pagerender import PageGraphicsItem, pixmapOfBackground, BarePageScene
-from remy.gui.export import ExportOperation
+from remy.gui.export import ExportOperation, WebUIExport
 
 from os import path
 
@@ -47,6 +47,11 @@ class NotebookViewer(QGraphicsView):
     act = QAction('Export document...', self)
     act.triggered.connect(lambda: self.export())
     self.menu.addAction(act)
+    ###
+    if QApplication.instance().source.get('enable_webui_export'):
+      act = QAction('PDF from WebUI...', self)
+      act.triggered.connect(lambda: self.webUIExport())
+      self.menu.addAction(act)
     ###
     self.menu.addSeparator() # --------------------------
     ###
@@ -288,7 +293,21 @@ class NotebookViewer(QGraphicsView):
         op.success.connect(lambda: QDesktopServices.openUrl(QUrl("file://" + filename)))
       op.run(filename, self.document, **ropt)
 
-
+  def webUIExport(self, filename=None):
+    ok = True
+    opt = QApplication.instance().config.get("export", {})
+    if filename is None:
+      filename = self.document.visibleName
+      if not filename.endswith(".pdf"):
+        filename += ".pdf"
+      filename = path.join(opt.get("default_dir", ""), filename)
+      filename, ok = QFileDialog.getSaveFileName(self, "Export PDF...", filename)
+    if ok and filename:
+      try:
+        op = WebUIExport(parent=self)
+        op.run(filename, self.document.uid)
+      except:
+        QMessageBox.critical(self, "Error", "Could not download PDF from WebUI.\nThis feature only works with USB connections.")
 
   def mathpix(self, pageNum=None, simplify=True):
     if pageNum is None:

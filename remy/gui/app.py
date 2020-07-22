@@ -67,9 +67,12 @@ def main():
   if source not in sources:
     log.fatal("Invalid source %s (available: %s)", source, ', '.join(sources))
     sys.exit(1)
-  src = sources[source]
+  src = app.source = sources[source]
   config.update(src.get("settings", {}))
   src.pop("settings", None)
+  if src.get("use_banner") and src.get("enable_webui_export"):
+    src.pop("use_banner")
+    log.warning("The `use_banner` setting is incompatible with `enable_webui_export`: the latter is overriding the former.")
   stype = src.get('type', 'ssh')
   if stype == 'ssh':
     if 'cache_dir' not in src:
