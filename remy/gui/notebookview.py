@@ -281,7 +281,7 @@ class NotebookViewer(QGraphicsView):
     if ok and filename:
       ropt = {
         "simplify": opt.get("simplify", 0),
-        "eraserMode": opt.get("eraserMode", "accurate")
+        "eraserMode": opt.get("eraser_mode", "accurate")
       } # this will be properly generalised at some point
       scenes = [self.makePageScene(i, forViewing=False, **ropt) for i in range(self._maxPage+1)]
       scenesPdf(scenes, filename)
