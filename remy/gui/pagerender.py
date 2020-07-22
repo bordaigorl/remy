@@ -82,6 +82,10 @@ class PageGraphicsItem(QGraphicsRectItem):
     pen.setJoinStyle(Qt.RoundJoin)
     pbrush = QBrush(Qt.Dense3Pattern)
 
+    totalStrokes = sum(len(l.strokes) for l in page.layers)
+    curStroke = 0
+    _progress(progress,curStroke,totalStrokes); curStroke += 1
+
     for l in page.layers:
       group = QGraphicsPathItem()
       group.setPen(noPen)
@@ -196,6 +200,8 @@ class PageGraphicsItem(QGraphicsRectItem):
 
           item=QGraphicsPathItem(path, group)
           item.setPen(pen)
+
+        _progress(progress,curStroke,totalStrokes); curStroke += 1
 
       group.setParentItem(self)
 
