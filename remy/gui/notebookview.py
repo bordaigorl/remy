@@ -8,8 +8,8 @@ from PyQt5.QtPrintSupport import *
 import remy.remarkable.constants as rm
 from remy.ocr.mathpix import mathpix
 
-from remy.gui.pagerender import PageGraphicsItem
-from remy.gui.export import scenesPdf, pdfmerge
+from remy.gui.pagerender import PageGraphicsItem, pixmapOfBackground, BarePageScene
+from remy.gui.export import ExportOperation
 
 from os import path
 
@@ -283,12 +283,11 @@ class NotebookViewer(QGraphicsView):
         "simplify": opt.get("simplify", 0),
         "eraserMode": opt.get("eraser_mode", "accurate")
       } # this will be properly generalised at some point
-      scenes = [self.makePageScene(i, forViewing=False, **ropt) for i in range(self._maxPage+1)]
-      scenesPdf(scenes, filename)
-      if isinstance(self.document, PDFDoc):
-        pdfmerge(scenes, self.document.retrieveBaseDocument(), filename)
+      op = ExportOperation(parent=self)
       if opt.get("open_exported", True):
-        QDesktopServices.openUrl(QUrl("file://" + filename))
+        op.success.connect(lambda: QDesktopServices.openUrl(QUrl("file://" + filename)))
+      op.run(filename, self.document, **ropt)
+
 
 
   def mathpix(self, pageNum=None, simplify=True):

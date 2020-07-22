@@ -160,6 +160,7 @@ class PageGraphicsItem(QGraphicsRectItem):
           subarea = eraserStroker.createStroke(subarea)
           log.debug('A: %f', time.perf_counter() - T1); T1 = time.perf_counter()
           subarea = subarea.simplified()  # this is expensive
+          log.debug('B: %f', time.perf_counter() - T1); T1 = time.perf_counter()
           # area = fullPageClip.subtracted(subarea)  # this alternative is also expensive
           area.addPath(subarea)
           group.setFlag(QGraphicsItem.ItemClipsChildrenToShape)
@@ -167,7 +168,6 @@ class PageGraphicsItem(QGraphicsRectItem):
           ### good for testing:
           # group.setPen(Qt.red)
           # group.setBrush(QBrush(QColor(255,0,0,50)))
-          log.debug('B: %f', time.perf_counter() - T1); T1 = time.perf_counter()
           newgroup = QGraphicsPathItem()
           newgroup.setPen(noPen)
           group.setParentItem(newgroup)
@@ -206,14 +206,27 @@ class PageGraphicsItem(QGraphicsRectItem):
       group.setParentItem(self)
 
 
-# def barePageScene(page, **kw):
-#   scene = QGraphicsScene()
-#   r = scene.addRect(0,0,rm.WIDTH, rm.HEIGHT)
-#   r.setFlag(QGraphicsItem.ItemClipsChildrenToShape)
-#   if page.background and page.background.name != "Blank":
-#     img = self.pixmapOfBackground(page.background) # todo
-#     if img:
-#       QGraphicsPixmapItem(img, r)
-#   PageGraphicsItem(page, parent=r, **kw)
-#   scene.setSceneRect(r.rect())
-#   return scene
+_TEMPLATE_CACHE = {}
+
+def pixmapOfBackground(bg):
+  if bg and bg.name not in _TEMPLATE_CACHE:
+    bgf = bg.retrieve()
+    if bgf:
+      _TEMPLATE_CACHE[bg.name] = QPixmap.fromImage(QImage(bgf))
+    else:
+      return None
+  return _TEMPLATE_CACHE[bg.name]
+
+
+class BarePageScene(QGraphicsScene):
+
+  def __init__(self, page, parent=None, **kw):
+    super().__init__(parent=parent)
+    r = self.addRect(0,0,rm.WIDTH, rm.HEIGHT)
+    r.setFlag(QGraphicsItem.ItemClipsChildrenToShape)
+    if page.background and page.background.name != "Blank":
+      img = pixmapOfBackground(page.background)
+      if img:
+        QGraphicsPixmapItem(img, r)
+    PageGraphicsItem(page, parent=r, **kw)
+    self.setSceneRect(r.rect())
