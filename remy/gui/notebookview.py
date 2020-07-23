@@ -8,8 +8,8 @@ from PyQt5.QtPrintSupport import *
 import remy.remarkable.constants as rm
 from remy.ocr.mathpix import mathpix
 
-from remy.gui.pagerender import PageGraphicsItem, pixmapOfBackground, BarePageScene
-from remy.gui.export import ExportOperation, WebUIExport
+from remy.gui.pagerender import PageGraphicsItem, BarePageScene
+from remy.gui.export import ExportOperation, WebUIExport, ExportDialog
 
 from os import path
 
@@ -136,7 +136,7 @@ class NotebookViewer(QGraphicsView):
         return None
     return self._templates[bg.name]
 
-  def makePageScene(self, i, forViewing=True, simplify=0, eraserMode="ignore"):
+  def makePageScene(self, i, forViewing=True, simplify=0, eraser_mode="ignore"):
     page = self.document.getPage(i)
     scene = QGraphicsScene()
     r = scene.addRect(0,0,rm.WIDTH, rm.HEIGHT)
@@ -161,7 +161,7 @@ class NotebookViewer(QGraphicsView):
       scene.baseItem = None
     # except Exception as e:
       # print("Too bad, can't open background %s" % e)
-    PageGraphicsItem(page, scene=scene, simplify=simplify, eraserMode=eraserMode, parent=r)
+    PageGraphicsItem(page, scene=scene, simplify=simplify, eraser_mode=eraser_mode, parent=r)
     scene.setSceneRect(r.rect())
     if forViewing:
       r=scene.addRect(0,0,rm.WIDTH, rm.HEIGHT)
@@ -172,7 +172,7 @@ class NotebookViewer(QGraphicsView):
     T0 = time.perf_counter()
     ermode = self.options.get("eraser_mode")
     if i not in self._page_cache:
-      self._page_cache[i] = self.makePageScene(i, eraserMode=ermode)
+      self._page_cache[i] = self.makePageScene(i, eraser_mode=ermode)
     self.setScene(self._page_cache[i])
     self._page = i
     self.refreshTitle()
@@ -274,24 +274,20 @@ class NotebookViewer(QGraphicsView):
     self.scale(1/self.devicePixelRatio(), 1/self.devicePixelRatio())
     self.rotate(self._rotation)
 
-  def export(self, filename=None):
+  def export(self):
     ok = True
     opt = QApplication.instance().config.get("export", {})
-    if filename is None:
-      filename = self.document.visibleName
-      if not filename.endswith(".pdf"):
-        filename += ".pdf"
-      filename = path.join(opt.get("default_dir", ""), filename)
-      filename, ok = QFileDialog.getSaveFileName(self, "Export PDF...", filename)
-    if ok and filename:
-      ropt = {
-        "simplify": opt.get("simplify", 0),
-        "eraserMode": opt.get("eraser_mode", "accurate")
-      } # this will be properly generalised at some point
+    filename = self.document.visibleName
+    if not filename.endswith(".pdf"):
+      filename += ".pdf"
+    filename = path.join(opt.get("default_dir", ""), filename)
+    # filename, ok = QFileDialog.getSaveFileName(self, "Export PDF...", filename)
+    filename, whichPages, opt, ok = ExportDialog.getFileExportOptions(filename=filename, options=opt, parent=self)
+    if ok:
       op = ExportOperation(parent=self)
-      if opt.get("open_exported", True):
+      if opt.pop("open_exported", True):
         op.success.connect(lambda: QDesktopServices.openUrl(QUrl("file://" + filename)))
-      op.run(filename, self.document, **ropt)
+      op.run(filename, self.document, whichPages=whichPages, **opt)
 
   def webUIExport(self, filename=None):
     ok = True

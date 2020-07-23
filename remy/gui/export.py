@@ -12,7 +12,7 @@ from PyPDF2.pdf import PageObject
 from PyPDF2.utils import PdfReadError
 from PyPDF2.generic import NullObject
 
-from remy.gui.pagerender import BarePageScene
+from remy.gui.pagerender import BarePageScene, DEFAULT_COLORS, DEFAULT_HIGHLIGHT
 
 from os import path
 import time
@@ -103,6 +103,35 @@ def pdfmerge(basePath, outputPath, progress=None):
   _progress(progress, pageNum + 1, pageNum + 1)
 
 
+def parsePageRange(s):
+  s = [i.strip() for i in s.split(':')]
+  if len(s) == 1 and len(s[0]) == 0:
+    return [None]
+  if len(s) > 3:
+    raise Exception("Could not parse page range")
+  r = []
+  for i in range(3):
+    if i >= len(s):
+      r.append(None)
+    elif s[i] == "end":
+      r.append(-1 if i == 0 else None)
+    else:
+      r.append(int(s[i]))
+  return r
+
+def validatePageRanges(whichPages):
+  try:
+    for s in whichPages.split(','):
+      parsePageRange(s)
+    return True
+  except:
+    return False
+
+
+def parsePageRanges(whichPages):
+  return [slice(*parsePageRange(s)) for s in whichPages.split(',')]
+
+
 from itertools import chain
 
 class CancelledExporter(Exception):
@@ -122,6 +151,8 @@ class Exporter(QThread):
     super().__init__(parent=parent)
     self.filename   = filename
     self.document   = document
+    if isinstance(whichPages, str):
+      whichPages = parsePageRanges(whichPages)
     self.whichPages = whichPages
     self.options    = options
 
@@ -180,15 +211,15 @@ class ExportOperation(QObject):
   step = 0
   success = pyqtSignal()
 
-  def run(self, *args, **kwargs):
-    self.t=time.perf_counter()
-    self.name = path.basename(args[0])
+  def run(self, filename, document, **kwargs):
+    print(filename, document, kwargs)
+    self.name = path.basename(filename)
     self.dialog = QProgressDialog(parent=self.parent())
     self.dialog.setWindowTitle("Exporting %s" % self.name)
     self.dialog.setLabelText("Initialising...")
     self.dialog.setMinimumDuration(2000)
     self.dialog.setAutoClose(True)
-    exporter = Exporter(*args, parent=self, **kwargs)
+    exporter = Exporter(filename, document, **kwargs, parent=self)
     exporter.onError.connect(self.onError)
     exporter.onNewPhase.connect(self.onNewPhase)
     exporter.onStart.connect(self.onStart)
@@ -199,7 +230,7 @@ class ExportOperation(QObject):
 
   @pyqtSlot(Exception)
   def onError(self, e):
-    self.dialog.hide()
+    self.dialog.close()
     if not isinstance(e, CancelledExporter):
       QMessageBox.critical(self.parent(), "Error", "Something went wrong while exporting.\n\n" + str(e))
 
@@ -216,7 +247,6 @@ class ExportOperation(QObject):
   @pyqtSlot()
   def onProgress(self):
     self.step += 1
-    self.t=time.perf_counter()
     self.dialog.setValue(self.step)
 
   @pyqtSlot()
@@ -250,3 +280,177 @@ class WebUIExport(QObject):
 
 
 
+class ExportDialog(QDialog):
+
+  FileExport = 0
+  FolderExport = 1
+
+  class ColorButton(QPushButton):
+
+    def __init__(self, *args, color=None, **kwargs):
+      super().__init__(*args, **kwargs)
+      self.setColor(color)
+      self.clicked.connect(self.selectColor)
+
+    @pyqtSlot(bool)
+    def selectColor(self, *args):
+      color = QColorDialog.getColor(self._color or Qt.black, self.window())
+      if color.isValid():
+        self.setColor(color)
+
+    def setColor(self, color):
+      self._color = color
+      if color is not None:
+        col = QPixmap(12,12)
+        col.fill(color)
+        self.setIcon(QIcon(col))
+
+    def color(self):
+      return self._color
+
+  @staticmethod
+  def getFileExportOptions(parent=None, options={}, **kwargs):
+    d = ExportDialog(mode=ExportDialog.FileExport, options=options, parent=parent, **kwargs)
+    res = d.exec_()
+    if res == QDialog.Accepted:
+      return (*d.getOptions(), True)
+    else:
+      return (None, "", options, False)
+
+  def __init__(self, filename=None, options={}, mode=None, **kwargs):
+    super(ExportDialog, self).__init__(**kwargs)
+    self.mode = ExportDialog.FileExport if mode is None else mode
+    self.options = options
+    self.filename = filename
+
+    self.setWindowTitle("Export")
+    self.setWindowModality(Qt.WindowModal)
+
+    buttonBox = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel | QDialogButtonBox.Reset)
+    buttonBox.accepted.connect(self.accept)
+    buttonBox.rejected.connect(self.reject)
+    reset = buttonBox.button(QDialogButtonBox.Reset)
+    reset.clicked.connect(self.reset)
+
+    form = QFormLayout()
+    form.setFieldGrowthPolicy(QFormLayout.ExpandingFieldsGrow)
+
+    # PATH SELECTION
+    pathsel = self.pathsel = QLineEdit()
+    pathsel.textChanged.connect(self.validatePath)
+
+    act = pathsel.addAction(QIcon(":assets/symbolic/folder.svg"), QLineEdit.TrailingPosition)
+    act.setToolTip("Change...")
+    act.triggered.connect(self.selectPath)
+
+    act = pathsel.addAction(QIcon(":assets/symbolic/warning.svg"), QLineEdit.TrailingPosition)
+    self.replaceWarning = act
+    act.setToolTip("A file or folder with the same name already exists.\nBy exporting to this location, you will overwrite its current contents.")
+    act.setVisible(False)
+
+    form.addRow("Export to:", pathsel)
+
+    # OPEN EXPORTED
+    self.openExp = QCheckBox("Open file on completion")
+    form.addRow("", self.openExp)
+
+
+    # PAGE RANGES
+    pageRanges = self.pageRanges = QLineEdit()
+    pageRanges.setPlaceholderText("all")
+    act = pageRanges.addAction(QIcon(":assets/symbolic/info.svg"), QLineEdit.TrailingPosition)
+    act.setToolTip("Examples:\nList of pages: 1,12,3\nRange: 3:end\nMixed: 5,1:3,end\nReverse order: end:1:-1\nSkipping even pages: 1:end:2")
+    act = pageRanges.addAction(QIcon(":assets/symbolic/error.svg"), QLineEdit.TrailingPosition)
+    self.pageRangeInvalid = act
+    act.setToolTip("Page range is invalid")
+    act.triggered.connect(self.pageRanges.clear)
+    act.setVisible(False)
+    pageRanges.textChanged.connect(self.validatePageRanges)
+    form.addRow("Page Ranges:", pageRanges)
+
+    # ERASER MODE
+    emode = self.eraserMode = QComboBox()
+    emode.addItem("Accurate", "accurate")
+    emode.addItem("Ignore", "ignore")
+    emode.addItem("Quick & Dirty", "quick")
+    form.addRow("Eraser mode:", emode)
+
+    # Simplification TOLERANCE
+    tolerance = self.tolerance = QDoubleSpinBox()
+    tolerance.setMinimum(0)
+    form.addRow("Simplification:", tolerance)
+
+    # COLOR SELECTION
+    colorsel = QGridLayout()
+    self.black = self.ColorButton("Black")
+    self.gray = self.ColorButton("Gray")
+    self.white = self.ColorButton("White")
+    self.highlight = self.ColorButton("Highlight")
+    colorsel.addWidget(self.black, 0, 0)
+    colorsel.addWidget(self.gray, 0, 1)
+    colorsel.addWidget(self.white, 1, 0)
+    colorsel.addWidget(self.highlight, 1, 1)
+    form.addRow("Colors:", colorsel)
+
+
+    layout = QVBoxLayout()
+    layout.addLayout(form)
+    layout.addWidget(buttonBox)
+    self.setLayout(layout)
+    self.reset()
+
+  @pyqtSlot(bool)
+  def selectPath(self, *args):
+    if self.mode == ExportDialog.FileExport:
+      filename, ok = QFileDialog.getSaveFileName(self, "Export PDF...", self.pathsel.text(), "PDF (*.pdf)")
+    else:
+      filename, ok = QFileDialog.getExistingDirectory(self, "Export PDF...", self.pathsel.text())
+    if ok and filename:
+      self.pathsel.setText(filename)
+
+  @pyqtSlot(str)
+  def validatePath(self, p):
+    if self.mode == ExportDialog.FileExport:
+      self.replaceWarning.setVisible(path.isfile(p))
+    else:
+      self.replaceWarning.setVisible(path.isdir(p))
+
+  @pyqtSlot(str)
+  def validatePageRanges(self, text):
+    v = not validatePageRanges(text)
+    log.info("V: '%s' %s", text, v)
+    self.pageRangeInvalid.setVisible(v)
+
+  @pyqtSlot(bool)
+  def reset(self, *args):
+    self.pathsel.setText(self.filename or "Document.pdf")
+    self.openExp.setChecked(self.options.get("open_exported", False))
+    self.pageRanges.clear()
+
+    emi = self.eraserMode.findData(self.options.get("eraser_mode", "ignore"))
+    if emi < 0: emi = 1
+    self.eraserMode.setCurrentIndex(emi)
+
+    self.tolerance.setValue(self.options.get("simplify", 0))
+    colors = self.options.get("colors", {})
+    self.black.setColor(QColor(colors.get("black", DEFAULT_COLORS[0])))
+    self.gray.setColor(QColor(colors.get("gray", DEFAULT_COLORS[1])))
+    self.white.setColor(QColor(colors.get("white", DEFAULT_COLORS[2])))
+    self.highlight.setColor(QColor(colors.get("highlight", DEFAULT_HIGHLIGHT)))
+
+  def getOptions(self):
+    return (
+      self.pathsel.text(),
+      self.pageRanges.text(),
+      {
+        'simplify': self.tolerance.value(),
+        'eraser_mode': self.eraserMode.currentData(),
+        'open_exported': self.openExp.isChecked(),
+        'colors': {
+          'black': self.black.color(),
+          'gray': self.gray.color(),
+          'white': self.white.color(),
+          'highlight': self.highlight.color(),
+        }
+      }
+    )

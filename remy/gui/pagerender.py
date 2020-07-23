@@ -60,14 +60,21 @@ class PageGraphicsItem(QGraphicsRectItem):
       colors=DEFAULT_COLORS,
       highlight=DEFAULT_HIGHLIGHT,
       simplify=0,
-      eraserMode=ACCURATE_ERASER,
+      eraser_mode=ACCURATE_ERASER,
       parent=None,
       progress=None,
   ):
     super().__init__(0,0,rm.WIDTH,rm.HEIGHT,parent)
 
-    if isinstance(eraserMode, str):
-      eraserMode = ERASER_MODE.get(eraserMode, ACCURATE_ERASER)
+    if isinstance(eraser_mode, str):
+      eraser_mode = ERASER_MODE.get(eraser_mode, ACCURATE_ERASER)
+    if isinstance(colors, dict):
+      highlight = colors.get('highlight', highlight)
+      colors = [
+        QColor(colors.get('black', DEFAULT_COLORS[0])),
+        QColor(colors.get('gray', DEFAULT_COLORS[1])),
+        QColor(colors.get('white', DEFAULT_COLORS[2])),
+      ]
 
     noPen = QPen(Qt.NoPen)
     noPen.setWidth(0)
@@ -124,7 +131,7 @@ class PageGraphicsItem(QGraphicsRectItem):
           calcwidth = flat_width
         elif (k.pen == 7 or k.pen == 13):
           #### MECHANICAL PENCIL ####
-          pen.setColor(colors[k.color])
+          pbrush.setColor(colors[k.color])
           pen.setBrush(pbrush)
           calcwidth = flat_width
         elif k.pen == 8:
@@ -142,9 +149,9 @@ class PageGraphicsItem(QGraphicsRectItem):
           # ERASE AREA
           # The remarkable renderer seems to ignore these!
           pass
-        elif k.pen == 6 and eraserMode == IGNORE_ERASER:
+        elif k.pen == 6 and eraser_mode == IGNORE_ERASER:
           pass
-        elif k.pen == 6 and eraserMode == ACCURATE_ERASER:
+        elif k.pen == 6 and eraser_mode == ACCURATE_ERASER:
           # ERASER
           T1 = time.perf_counter()
           eraserStroker.setWidth(k.width)
