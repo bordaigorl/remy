@@ -330,11 +330,15 @@ class NotebookViewer(QGraphicsView):
       self.close()
     elif event.key() == Qt.Key_Left:
       if event.modifiers() & Qt.ControlModifier:
+        self.loadPage(0)
+      elif event.modifiers() & Qt.MetaModifier:
         self.rotateCCW()
       else:
         self.prevPage()
     elif event.key() == Qt.Key_Right:
       if event.modifiers() & Qt.ControlModifier:
+        self.loadPage(self._maxPage)
+      elif event.modifiers() & Qt.MetaModifier:
         self.rotateCW()
       else:
         self.nextPage()
