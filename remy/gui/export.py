@@ -223,7 +223,6 @@ class ExportOperation(QObject):
   success = pyqtSignal()
 
   def run(self, filename, document, **kwargs):
-    print(filename, document, kwargs)
     self.name = path.basename(filename)
     self.dialog = QProgressDialog(parent=self.parent())
     self.dialog.setWindowTitle("Exporting %s" % self.name)
@@ -248,7 +247,6 @@ class ExportOperation(QObject):
 
   @pyqtSlot(int)
   def onStart(self, total):
-    log.info("Started %d steps", total)
     self.dialog.setMaximum(total)
 
   @pyqtSlot(str)
@@ -429,7 +427,6 @@ class ExportDialog(QDialog):
   @pyqtSlot(str)
   def validatePageRanges(self, text):
     v = not validatePageRanges(text)
-    log.info("V: '%s' %s", text, v)
     self.pageRangeInvalid.setVisible(v)
 
   @pyqtSlot(bool)
