@@ -103,18 +103,29 @@ def pdfmerge(basePath, outputPath, progress=None):
   _progress(progress, pageNum + 1, pageNum + 1)
 
 
+
+def _pageint(i):
+  i = int(i)
+  return (i if i < 0 else i-1)
+
 def parsePageRange(s):
   s = [i.strip() for i in s.split(':')]
-  if len(s) == 1 and len(s[0]) == 0:
-    return [None]
   if len(s) > 3:
     raise Exception("Could not parse page range")
   r = []
+  if len(s) == 1:
+    if len(s[0]) == 0:
+      return [None]
+    i = -1 if s[0] == "end" or len(s[0]) == 0 else _pageint(s[0])
+    j = None if i == -1 else i+1
+    return [i, j]
   for i in range(3):
     if i >= len(s):
       r.append(None)
-    elif s[i] == "end":
+    elif s[i] == "end" or len(s[i]) == 0:
       r.append(-1 if i == 0 else None)
+    elif i < 2:
+      r.append(_pageint(s[i]))
     else:
       r.append(int(s[i]))
   return r
