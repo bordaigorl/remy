@@ -384,10 +384,15 @@ class ExportDialog(QDialog):
     emode.addItem("Quick & Dirty", "quick")
     form.addRow("Eraser mode:", emode)
 
-    # Simplification TOLERANCE
+    # Simplification TOLERANCE & smoothening
+    simplsm = QHBoxLayout()
     tolerance = self.tolerance = QDoubleSpinBox()
     tolerance.setMinimum(0)
-    form.addRow("Simplification:", tolerance)
+    tolerance.setSingleStep(0.5)
+    smoothen = self.smoothen = QCheckBox("Smoothen")
+    simplsm.addWidget(tolerance)
+    simplsm.addWidget(smoothen)
+    form.addRow("Simplification:", simplsm)
 
     # COLOR SELECTION
     colorsel = QGridLayout()
@@ -439,6 +444,7 @@ class ExportDialog(QDialog):
     if emi < 0: emi = 1
     self.eraserMode.setCurrentIndex(emi)
 
+    self.smoothen.setChecked(self.options.get("smoothen", False))
     self.tolerance.setValue(self.options.get("simplify", 0))
     colors = self.options.get("colors", {})
     self.black.setColor(QColor(colors.get("black", DEFAULT_COLORS[0])))
@@ -454,6 +460,7 @@ class ExportDialog(QDialog):
         'simplify': self.tolerance.value(),
         'eraser_mode': self.eraserMode.currentData(),
         'open_exported': self.openExp.isChecked(),
+        'smoothen': self.smoothen.isChecked(),
         'colors': {
           'black': self.black.color(),
           'gray': self.gray.color(),
