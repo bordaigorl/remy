@@ -227,14 +227,6 @@ class PageGraphicsItem(QGraphicsRectItem):
           group = newgroup
         else:
           if (simplify > 0 or smoothen) and (k.pen == 4 or k.pen == 17):
-            # SIMPLIFIED (Test)
-            # pen.setWidthF(k.width)
-            # for s in simpl(k, simplify):
-            #   if path:
-            #     path.lineTo(s[0],s[1])
-            #   else:
-            #     path = QPainterPath(QPointF(s[0], s[1]))
-            # END SIMPLIFIED
             pen.setWidthF(k.width)
             if simplify > 0:
               sk = simpl(k, simplify)
