@@ -51,6 +51,51 @@ ERASER_MODE = {
 }
 
 
+def bezierInterpolation(K, coord):
+  n = len(K)-1
+  p1=[0.]*n
+  p2=[0.]*n
+
+  a=[0.]*n
+  b=[0.]*n
+  c=[0.]*n
+  r=[0.]*n
+
+  a[0]=0.
+  b[0]=2.
+  c[0]=1.
+  r[0] = K[0][coord]+2.*K[1][coord]
+
+  for i in range(1,n-1):
+    a[i]=1.
+    b[i]=4.
+    c[i]=1.
+    r[i] = 4. * K[i][coord] + 2. * K[i+1][coord]
+
+  a[n-1]=2.
+  b[n-1]=7.
+  c[n-1]=0.
+  r[n-1] = 8. *K[n-1][coord] + K[n][coord]
+
+  # Thomas algorithm
+  for i in range(1,n):
+    m = a[i]/b[i-1]
+    b[i] = b[i] - m * c[i - 1]
+    r[i] = r[i] - m * r[i-1]
+
+  p1[n-1] = r[n-1]/b[n-1]
+  for i in range(n-2,-1,-1):
+    p1[i] = (r[i] - c[i] * p1[i+1]) / b[i]
+
+  for i in range(n-1):
+    p2[i]=2.*K[i+1][coord]-p1[i+1]
+
+  p2[n-1]=0.5*(K[n][coord]+p1[n-1])
+
+  return (p1,p2)
+
+
+
 class PageGraphicsItem(QGraphicsRectItem):
 
   def __init__(
@@ -60,6 +105,7 @@ class PageGraphicsItem(QGraphicsRectItem):
       colors=DEFAULT_COLORS,
       highlight=DEFAULT_HIGHLIGHT,
       simplify=0,
+      smoothen=False,
       eraser_mode=ACCURATE_ERASER,
       parent=None,
       progress=None,
@@ -180,15 +226,31 @@ class PageGraphicsItem(QGraphicsRectItem):
           group.setParentItem(newgroup)
           group = newgroup
         else:
-          if simplify > 0 and (k.pen == 4 or k.pen == 17):
+          if (simplify > 0 or smoothen) and (k.pen == 4 or k.pen == 17):
             # SIMPLIFIED (Test)
-            pen.setWidthF(k.width)
-            for s in simpl(k, simplify):
-              if path:
-                path.lineTo(s[0],s[1])
-              else:
-                path = QPainterPath(QPointF(s[0], s[1]))
+            # pen.setWidthF(k.width)
+            # for s in simpl(k, simplify):
+            #   if path:
+            #     path.lineTo(s[0],s[1])
+            #   else:
+            #     path = QPainterPath(QPointF(s[0], s[1]))
             # END SIMPLIFIED
+            pen.setWidthF(k.width)
+            if simplify > 0:
+              sk = simpl(k, simplify)
+            else:
+              sk = k.segments
+            path = QPainterPath(QPointF(sk[0][0], sk[0][1]))
+            if len(sk) == 2:
+              path.lineTo(sk[1][0],sk[1][1])
+            elif smoothen:
+              px1, px2 = bezierInterpolation(sk, 0)
+              py1, py2 = bezierInterpolation(sk, 1)
+              for i in range(1,len(sk)):
+                path.cubicTo(px1[i-1],py1[i-1],px2[i-1],py2[i-1],sk[i][0],sk[i][1])
+            else:
+              for i in range(1,len(sk)):
+                path.lineTo(sk[i][0],sk[i][1])
           else:
             # STANDARD
             for s in k.segments:

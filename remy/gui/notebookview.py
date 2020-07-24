@@ -136,7 +136,7 @@ class NotebookViewer(QGraphicsView):
         return None
     return self._templates[bg.name]
 
-  def makePageScene(self, i, forViewing=True, simplify=0, eraser_mode="ignore"):
+  def makePageScene(self, i, forViewing=True, simplify=0, smoothen=False, eraser_mode="ignore"):
     page = self.document.getPage(i)
     scene = QGraphicsScene()
     r = scene.addRect(0,0,rm.WIDTH, rm.HEIGHT)
@@ -161,7 +161,7 @@ class NotebookViewer(QGraphicsView):
       scene.baseItem = None
     # except Exception as e:
       # print("Too bad, can't open background %s" % e)
-    PageGraphicsItem(page, scene=scene, simplify=simplify, eraser_mode=eraser_mode, parent=r)
+    PageGraphicsItem(page, scene=scene, simplify=simplify, smoothen=smoothen, eraser_mode=eraser_mode, parent=r)
     scene.setSceneRect(r.rect())
     if forViewing:
       r=scene.addRect(0,0,rm.WIDTH, rm.HEIGHT)
@@ -324,6 +324,7 @@ class NotebookViewer(QGraphicsView):
 
 
   _tolerance = {}
+  _smoothen = False
 
   def keyPressEvent(self, event):
     if event.matches(QKeySequence.Close):
@@ -352,6 +353,11 @@ class NotebookViewer(QGraphicsView):
       self.zoomOut()
     elif event.key() == Qt.Key_E:
       self.export()
+    elif event.key() == Qt.Key_S and event.modifiers() & Qt.MetaModifier:
+      self._smoothen = not self._smoothen
+      i = self._page
+      self._page_cache[i] = self.makePageScene(i, simplify=self._tolerance[i], smoothen=self._smoothen)
+      self.setScene(self._page_cache[i])
     elif event.key() == Qt.Key_S:
       i = self._page
       self._tolerance.setdefault(i, .5)
@@ -360,6 +366,6 @@ class NotebookViewer(QGraphicsView):
           self._tolerance[i] -= .5
       else:
         self._tolerance[i] += .5
-      self._page_cache[i] = self.makePageScene(i, simplify=self._tolerance[i])
+      self._page_cache[i] = self.makePageScene(i, simplify=self._tolerance[i], smoothen=self._smoothen)
       self.setScene(self._page_cache[i])
 
