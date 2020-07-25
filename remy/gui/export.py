@@ -12,6 +12,7 @@ from PyPDF2.pdf import PageObject
 from PyPDF2.utils import PdfReadError
 from PyPDF2.generic import NullObject
 
+from remy.remarkable.metadata import PDFDoc
 from remy.gui.pagerender import BarePageScene, DEFAULT_COLORS, DEFAULT_HIGHLIGHT
 
 from os import path
@@ -60,18 +61,23 @@ def scenesPdf(scenes, outputPath, progress=None):
     p.end()
 
 
-def pdfmerge(basePath, outputPath, progress=None):
+def pdfmerge(basePath, outputPath, pdfRanges=None, progress=None):
   if isinstance(basePath, PdfFileReader):
     baseReader = basePath
   else:
     baseReader = PdfFileReader(basePath, strict=False)
   annotReader = PdfFileReader(outputPath, strict=False)
-  pageNum = min(baseReader.getNumPages(), annotReader.getNumPages())
+  if pdfRanges is None:
+    pageNum = min(baseReader.getNumPages(), annotReader.getNumPages())
+    pdfRanges = range(pageNum)
+  else:
+    pageNum = sum(len(r) for r in pdfRanges)
+    pdfRanges = chain(*pdfRanges)
   writer = TolerantPdfWriter()
   _progress(progress, 0, pageNum + 1)
-  for page in range(pageNum):
+  for apage, page in enumerate(pdfRanges):
     bp = baseReader.getPage(page)
-    ap = annotReader.getPage(page)
+    ap = annotReader.getPage(apage)
 
     s = ap.cropBox or ap.artBox
     aw, ah = s.upperRight[0] - s.upperLeft[0], s.upperLeft[1] - s.lowerLeft[1]
@@ -132,6 +138,8 @@ def parsePageRange(s):
 
 def validatePageRanges(whichPages):
   try:
+    if whichPages.strip() == "marked":
+      return True
     for s in whichPages.split(','):
       parsePageRange(s)
     return True
@@ -139,7 +147,12 @@ def validatePageRanges(whichPages):
     return False
 
 
-def parsePageRanges(whichPages):
+def parsePageRanges(whichPages, document=None):
+  if whichPages.strip() == "marked":
+    if isinstance(document, PDFDoc):
+      return [slice(i,i+1) for i in document.markedPages()]
+    else:
+      return [slice(None)]
   return [slice(*parsePageRange(s)) for s in whichPages.split(',')]
 
 
@@ -163,7 +176,7 @@ class Exporter(QThread):
     self.filename   = filename
     self.document   = document
     if isinstance(whichPages, str):
-      whichPages = parsePageRanges(whichPages)
+      whichPages = parsePageRanges(whichPages, document)
     self.whichPages = whichPages
     self.options    = options
 
@@ -209,7 +222,7 @@ class Exporter(QThread):
       scenesPdf(scenes, self.filename, progress=self._progress)
       if pdf:
         self.onNewPhase.emit("Merging with original PDF")
-        pdfmerge(pdf, self.filename, progress=self._progress)
+        pdfmerge(pdf, self.filename, pdfRanges=ranges, progress=self._progress)
 
       self.onSuccess.emit()
     except Exception as e:
