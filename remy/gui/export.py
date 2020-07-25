@@ -296,14 +296,15 @@ class ExportDialog(QDialog):
 
   class ColorButton(QPushButton):
 
-    def __init__(self, *args, color=None, **kwargs):
+    def __init__(self, *args, color=None, options=QColorDialog.ColorDialogOptions(), **kwargs):
       super().__init__(*args, **kwargs)
+      self.options = options
       self.setColor(color)
       self.clicked.connect(self.selectColor)
 
     @pyqtSlot(bool)
     def selectColor(self, *args):
-      color = QColorDialog.getColor(self._color or Qt.black, self.window())
+      color = QColorDialog.getColor(self._color or Qt.black, self.window(), options=self.options)
       if color.isValid():
         self.setColor(color)
 
@@ -399,7 +400,7 @@ class ExportDialog(QDialog):
     self.black = self.ColorButton("Black")
     self.gray = self.ColorButton("Gray")
     self.white = self.ColorButton("White")
-    self.highlight = self.ColorButton("Highlight")
+    self.highlight = self.ColorButton("Highlight", options=QColorDialog.ShowAlphaChannel)
     colorsel.addWidget(self.black, 0, 0)
     colorsel.addWidget(self.gray, 0, 1)
     colorsel.addWidget(self.white, 1, 0)
