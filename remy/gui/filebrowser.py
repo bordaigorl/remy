@@ -293,6 +293,7 @@ class DocTree(QTreeWidget):
 
   def __init__(self, index, *a, uid=None, **kw):
     super(DocTree, self).__init__(*a, **kw)
+    self.setMinimumWidth(400)
     self.setIconSize(QSize(24,24))
     # self.setColumnCount(4)
     self.setHeaderLabels(["Name", "Updated", "", "Type"])
@@ -394,7 +395,7 @@ class FileBrowser(QMainWindow):
 
     # tree.doubleClicked.connect(self.openEntry)
 
-    self.setWindowTitle("Remy")
+    self.setWindowTitle("ReMy")
     self.show()
     dg = QApplication.desktop().availableGeometry(self)
     self.resize(dg.size() * 0.5)
@@ -402,7 +403,8 @@ class FileBrowser(QMainWindow):
     fg.moveCenter(dg.center())
     self.move(fg.topLeft())
 
-    splitter.setStretchFactor(0,1.5)
+    splitter.setStretchFactor(0,2)
+    splitter.setStretchFactor(1,1)
 
   @pyqtSlot(str, list,list)
   def _import(self, p, dirs, files):

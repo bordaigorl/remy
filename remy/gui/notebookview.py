@@ -302,6 +302,8 @@ class NotebookViewer(QGraphicsView):
       try:
         op = WebUIExport(parent=self)
         op.run(filename, self.document.uid)
+        if opt.pop("open_exported", True):
+          QDesktopServices.openUrl(QUrl("file://" + filename))
       except:
         QMessageBox.critical(self, "Error", "Could not download PDF from WebUI.\nThis feature only works with USB connections.")
 
@@ -356,6 +358,7 @@ class NotebookViewer(QGraphicsView):
     elif event.key() == Qt.Key_S and event.modifiers() & Qt.MetaModifier:
       self._smoothen = not self._smoothen
       i = self._page
+      self._tolerance.setdefault(i, 0)
       self._page_cache[i] = self.makePageScene(i, simplify=self._tolerance[i], smoothen=self._smoothen)
       self.setScene(self._page_cache[i])
     elif event.key() == Qt.Key_S:

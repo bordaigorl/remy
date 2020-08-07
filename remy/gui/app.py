@@ -37,6 +37,7 @@ def main():
 
   QCoreApplication.setAttribute(Qt.AA_EnableHighDpiScaling)
   app = QApplication(sys.argv)
+  app.setWindowIcon(QIcon(':/assets/remy.svg'))
 
   if os.path.isfile(confpath):
     try:
@@ -108,7 +109,6 @@ def main():
   #   f.setBold(True)
   #   sit.setFont(0, f)
 
-  app.setWindowIcon(QIcon(':/assets/remy.svg'))
   tree =  FileBrowser(index)
 
   @pyqtSlot()
