@@ -190,6 +190,10 @@ class Exporter(QThread):
     if i > 0:
       self.onProgress.emit()
 
+  def __del__(self):
+    self._cancel = True
+    self.wait()
+
   def run(self):
     try:
       scenes = []
