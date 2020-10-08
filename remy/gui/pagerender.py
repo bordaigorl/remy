@@ -247,7 +247,7 @@ class PageGraphicsItem(QGraphicsRectItem):
             # STANDARD
             for s in k.segments:
               w = calcwidth(k, s)
-              if w == pen.width() and path:
+              if w == pen.widthF() and path:
                 path.lineTo(s.x,s.y)
               else:
                 if path:
