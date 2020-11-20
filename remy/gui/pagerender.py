@@ -105,7 +105,7 @@ class PageGraphicsItem(QGraphicsRectItem):
   def __init__(
       self,
       page,
-      scene=None,
+      scene,
       colors=DEFAULT_COLORS,
       highlight=DEFAULT_HIGHLIGHT,
       simplify=0,
@@ -286,6 +286,10 @@ class PageGraphicsItem(QGraphicsRectItem):
 
 _TEMPLATE_CACHE = {}
 
+# TODO:
+#   from PyQt5.QtSvg import QSvgRenderer
+#   cache r=QSvgRenderer(svgfile)
+#   and use i=QGraphicsSvgItem(); i.setSharedRenderer(r)
 def pixmapOfBackground(bg):
   if bg and bg.name not in _TEMPLATE_CACHE:
     bgf = bg.retrieve()
@@ -296,15 +300,14 @@ def pixmapOfBackground(bg):
   return _TEMPLATE_CACHE[bg.name]
 
 
-class BarePageScene(QGraphicsScene):
-
-  def __init__(self, page, parent=None, **kw):
-    super().__init__(parent=parent)
-    r = self.addRect(0,0,rm.WIDTH, rm.HEIGHT)
-    r.setFlag(QGraphicsItem.ItemClipsChildrenToShape)
-    if page.background and page.background.name != "Blank":
-      img = pixmapOfBackground(page.background)
-      if img:
-        QGraphicsPixmapItem(img, r)
-    PageGraphicsItem(page, parent=r, **kw)
-    self.setSceneRect(r.rect())
+def BarePageScene(page, parent=None, include_base_layer=True, orientation=None, **kw):
+  scene = QGraphicsScene(parent=parent)
+  r = scene.addRect(0,0,rm.WIDTH, rm.HEIGHT)
+  r.setFlag(QGraphicsItem.ItemClipsChildrenToShape)
+  if page.background and page.background.name != "Blank" and include_base_layer:
+    img = pixmapOfBackground(page.background)
+    if img:
+      QGraphicsPixmapItem(img, r)
+  PageGraphicsItem(page, parent=r, **kw)
+  scene.setSceneRect(r.rect())
+  return scene
