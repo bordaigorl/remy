@@ -349,7 +349,7 @@ class RemarkableIndex:
           elif prop.type == DOCUMENT_TYPE:
             index[parent].files.append(k)
       except KeyError as e:
-        raise RemarkableDocumentError("Could not find field '{0}' in document {1}".format(e,k))
+        raise RemarkableDocumentError("Could not find field {0} in document {1}".format(e,k))
 
     self.index = index
     self.trash = trash

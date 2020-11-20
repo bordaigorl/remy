@@ -68,7 +68,7 @@ def list_trash(docs):
 
 _test_pwd = None
 
-def test(where=where, templ=templ):
+def load(where=where, templ=templ):
   global _test_pwd
   docs = RemarkableIndex(LocalFileSource("Backup", where, templ))
   _test_pwd = [ROOT_ID, docs]
