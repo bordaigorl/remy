@@ -199,7 +199,7 @@ class Exporter(QThread):
       scenes = []
       totPages = self.document.pageCount or 0
       pdf = None
-      if isinstance(self.document, PDFDoc):
+      if isinstance(self.document, PDFDoc) and self.options.get('include_base_layer', True):
         pdf = self.document.retrieveBaseDocument()
         baseReader = PdfFileReader(pdf, strict=False)
         totPages = baseReader.getNumPages()
@@ -395,6 +395,10 @@ class ExportDialog(QDialog):
     pageRanges.textChanged.connect(self.validatePageRanges)
     form.addRow("Page Ranges:", pageRanges)
 
+    # INCLUDE BASE LAYER
+    includeBase = self.includeBase = QCheckBox("Include template/base document")
+    form.addRow("", includeBase)
+
     # ERASER MODE
     emode = self.eraserMode = QComboBox()
     emode.addItem("Auto", "auto")
@@ -463,6 +467,8 @@ class ExportDialog(QDialog):
     if emi < 0: emi = 1
     self.eraserMode.setCurrentIndex(emi)
 
+    self.includeBase.setChecked(self.options.get("include_base_layer", True))
+
     self.smoothen.setChecked(self.options.get("smoothen", False))
     self.tolerance.setValue(self.options.get("simplify", 0))
     colors = self.options.get("colors", {})
@@ -479,6 +485,7 @@ class ExportDialog(QDialog):
         'simplify': self.tolerance.value(),
         'eraser_mode': self.eraserMode.currentData(),
         'open_exported': self.openExp.isChecked(),
+        'include_base_layer': self.includeBase.isChecked(),
         'smoothen': self.smoothen.isChecked(),
         'colors': {
           'black': self.black.color(),
