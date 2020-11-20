@@ -116,7 +116,6 @@ class PageGraphicsItem(QGraphicsRectItem):
   ):
     super().__init__(0,0,rm.WIDTH,rm.HEIGHT,parent)
 
-    eraser_mode = AUTO_ERASER
     if isinstance(eraser_mode, str):
       eraser_mode = ERASER_MODE.get(eraser_mode, AUTO_ERASER)
     if isinstance(colors, dict):
