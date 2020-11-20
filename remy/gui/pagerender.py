@@ -21,7 +21,7 @@ def flat_width(stroke, segment):
   return stroke.width
 
 def dynamic_width(stroke, segment):
-  return segment.width + segment.pressure
+  return segment.width #+ segment.pressure
 
 def bold_dynamic_width(stroke, segment):
   return max(segment.width * segment.pressure * .7, stroke.width * .8)
@@ -43,11 +43,15 @@ DEFAULT_HIGHLIGHT = QColor(255,235,147, 80)
 QUICK_ERASER    = 0
 IGNORE_ERASER   = 1
 ACCURATE_ERASER = 2
+AUTO_ERASER = 4
+AUTO_ERASER_IGNORE = 4
+AUTO_ERASER_ACCURATE = 5
 
 ERASER_MODE = {
   "quick": QUICK_ERASER,
   "ignore": IGNORE_ERASER,
   "accurate": ACCURATE_ERASER,
+  "auto": AUTO_ERASER,
 }
 
 
@@ -106,14 +110,15 @@ class PageGraphicsItem(QGraphicsRectItem):
       highlight=DEFAULT_HIGHLIGHT,
       simplify=0,
       smoothen=False,
-      eraser_mode=ACCURATE_ERASER,
+      eraser_mode=AUTO_ERASER,
       parent=None,
       progress=None,
   ):
     super().__init__(0,0,rm.WIDTH,rm.HEIGHT,parent)
 
+    eraser_mode = AUTO_ERASER
     if isinstance(eraser_mode, str):
-      eraser_mode = ERASER_MODE.get(eraser_mode, ACCURATE_ERASER)
+      eraser_mode = ERASER_MODE.get(eraser_mode, AUTO_ERASER)
     if isinstance(colors, dict):
       highlight = colors.get('highlight', highlight)
       colors = [
@@ -142,44 +147,57 @@ class PageGraphicsItem(QGraphicsRectItem):
     for l in page.layers:
       group = QGraphicsPathItem()
       group.setPen(noPen)
+      if eraser_mode >= AUTO_ERASER:
+        eraser_mode = AUTO_ERASER_IGNORE
 
       for k in l.strokes:
         calcwidth = dynamic_width
         if k.pen == 0 or k.pen == 12:
           #### BRUSH             ####
           pen.setColor(colors[k.color])
+          if eraser_mode == AUTO_ERASER:
+            eraser_mode = AUTO_ERASER_ACCURATE
         elif (k.pen == 1 or k.pen == 14):
           #### PENCIL            ####
           c = QColor(colors[k.color])
           c.setAlpha(180)
           pbrush.setColor(c)
           pen.setBrush(pbrush)
+          if eraser_mode == AUTO_ERASER:
+            if max(s.width for s in k.segments) > 2:
+              eraser_mode = AUTO_ERASER_ACCURATE
         elif (k.pen == 2 or k.pen == 15):
           #### BALLPOINT         ####
           pen.setColor(colors[k.color])
-          calcwidth = very_dynamic_width
+          # calcwidth = very_dynamic_width
           # pen.setWidth(2)
         elif (k.pen == 3 or k.pen == 16):
           #### MARKER            ####
           pen.setColor(colors[k.color])
-          calcwidth = bold_dynamic_width
+          # calcwidth = bold_dynamic_width
+          if eraser_mode == AUTO_ERASER:
+            eraser_mode = AUTO_ERASER_ACCURATE
         elif (k.pen == 4 or k.pen == 17):
           #### FINELINER         ####
           pen.setColor(colors[k.color])
-          calcwidth = flat_width
+          # calcwidth = flat_width
+        elif (k.pen == 9 or k.pen == 21):
+          #### CALLIGRAPHY       ####
+          pen.setColor(colors[k.color])
+          # calcwidth = dynamic_width
         elif (k.pen == 5 or k.pen == 18):
           #### HIGHLIGHTER       ####
           pen.setColor(highlight)
-          calcwidth = const_width(30)
+          # calcwidth = const_width(30)
         elif (k.pen == 6):
           #### ERASER            ####
           pen.setColor(Qt.white)
-          calcwidth = flat_width
+          # calcwidth = flat_width
         elif (k.pen == 7 or k.pen == 13):
           #### MECHANICAL PENCIL ####
           pbrush.setColor(colors[k.color])
           pen.setBrush(pbrush)
-          calcwidth = flat_width
+          # calcwidth = flat_width
         elif k.pen == 8:
           #### ERASE AREA        ####
           # pen.setColor(Qt.white)
@@ -195,9 +213,9 @@ class PageGraphicsItem(QGraphicsRectItem):
           # ERASE AREA
           # The remarkable renderer seems to ignore these!
           pass
-        elif k.pen == 6 and eraser_mode == IGNORE_ERASER:
+        elif k.pen == 6 and eraser_mode % 3 == IGNORE_ERASER:
           pass
-        elif k.pen == 6 and eraser_mode == ACCURATE_ERASER:
+        elif k.pen == 6 and eraser_mode % 3 == ACCURATE_ERASER:
           # ERASER
           T1 = time.perf_counter()
           eraserStroker.setWidth(k.width)

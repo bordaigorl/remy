@@ -397,6 +397,7 @@ class ExportDialog(QDialog):
 
     # ERASER MODE
     emode = self.eraserMode = QComboBox()
+    emode.addItem("Auto", "auto")
     emode.addItem("Accurate", "accurate")
     emode.addItem("Ignore", "ignore")
     emode.addItem("Quick & Dirty", "quick")
