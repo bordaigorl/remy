@@ -61,7 +61,18 @@ def scenesPdf(scenes, outputPath, progress=None):
     p.end()
 
 
-def pdfmerge(basePath, outputPath, pdfRanges=None, progress=None):
+def pdfrotate(outputPath, rotate=0):
+  reader = PdfFileReader(outputPath, strict=False)
+  writer = TolerantPdfWriter()
+  for pageNum in range(reader.numPages):
+    page = reader.getPage(pageNum)
+    page.rotateClockwise(90)
+    writer.addPage(page)
+  with open(outputPath, 'wb') as out:
+    writer.write(out)
+
+
+def pdfmerge(basePath, outputPath, pdfRanges=None, rotate=0, progress=None):
   if isinstance(basePath, PdfFileReader):
     baseReader = basePath
   else:
@@ -98,6 +109,8 @@ def pdfmerge(basePath, outputPath, pdfRanges=None, progress=None):
       rot = 90
     np.mergeRotatedScaledTranslatedPage(bp, rot, ratio, tx, ty)
     np.mergePage(ap)
+    if rotate:
+      np.rotateCounterClockwise(rotate)
 
     writer.addPage(np)
     _progress(progress, page, pageNum + 1)
@@ -204,6 +217,12 @@ class Exporter(QThread):
         baseReader = PdfFileReader(pdf, strict=False)
         totPages = baseReader.getNumPages()
 
+      rot = self.options.get("orientation", "auto")
+      if rot == "auto":
+        rot = self.document.orientation != "portrait"
+      else:
+        rot = rot == "landscape"
+
       ranges = [range(*s.indices(totPages)) for s in self.whichPages]
       steps = sum(len(r) for r in ranges)
       if pdf:
@@ -226,7 +245,9 @@ class Exporter(QThread):
       scenesPdf(scenes, self.filename, progress=self._progress)
       if pdf:
         self.onNewPhase.emit("Merging with original PDF")
-        pdfmerge(pdf, self.filename, pdfRanges=ranges, progress=self._progress)
+        pdfmerge(pdf, self.filename, pdfRanges=ranges, rotate=90 if rot else 0, progress=self._progress)
+      elif rot:
+        pdfrotate(self.filename, 90)
 
       self.onSuccess.emit()
     except Exception as e:
@@ -381,6 +402,12 @@ class ExportDialog(QDialog):
     self.openExp = QCheckBox("Open file on completion")
     form.addRow("", self.openExp)
 
+    # ORIENTATION
+    orient = self.orientation = QComboBox()
+    orient.addItem("Auto", "auto")
+    orient.addItem("Portrait", "portrait")
+    orient.addItem("Landscape", "landscape")
+    form.addRow("Orientation:", orient)
 
     # PAGE RANGES
     pageRanges = self.pageRanges = QLineEdit()
@@ -467,6 +494,10 @@ class ExportDialog(QDialog):
     if emi < 0: emi = 1
     self.eraserMode.setCurrentIndex(emi)
 
+    o = self.orientation.findData(self.options.get("orientation", "auto"))
+    if o < 0: o = 0
+    self.orientation.setCurrentIndex(o)
+
     self.includeBase.setChecked(self.options.get("include_base_layer", True))
 
     self.smoothen.setChecked(self.options.get("smoothen", False))
@@ -484,6 +515,7 @@ class ExportDialog(QDialog):
       {
         'simplify': self.tolerance.value(),
         'eraser_mode': self.eraserMode.currentData(),
+        'orientation': self.orientation.currentData(),
         'open_exported': self.openExp.isChecked(),
         'include_base_layer': self.includeBase.isChecked(),
         'smoothen': self.smoothen.isChecked(),
