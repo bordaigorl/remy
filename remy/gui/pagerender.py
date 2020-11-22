@@ -308,6 +308,6 @@ def BarePageScene(page, parent=None, include_base_layer=True, orientation=None, 
     img = pixmapOfBackground(page.background)
     if img:
       QGraphicsPixmapItem(img, r)
-  PageGraphicsItem(page, parent=r, **kw)
+  PageGraphicsItem(page, scene=scene, parent=r, **kw)
   scene.setSceneRect(r.rect())
   return scene
