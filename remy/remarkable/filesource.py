@@ -101,8 +101,8 @@ class LocalFileSource(FileSource):
   """An abstraction over a local backup folder"""
   def __init__(self, name, root, templatesRoot=None):
     self.name = name
-    self.root = root
-    self.templatesRoot = templatesRoot
+    self.root = root = path.expanduser(root)
+    self.templatesRoot = templatesRoot = path.expanduser(templatesRoot)
     if templatesRoot:
       self.templates = {}
       with open(path.join(templatesRoot, "templates.json"), 'r') as f:
@@ -179,7 +179,7 @@ class LiveFileSourceSSH(FileSource):
   def __init__(self, name, ssh, cache_dir=None, use_banner=False, **kw):
     self.ssh = ssh
     self.name = name
-    self.cache_dir = cache_dir
+    self.cache_dir = cache_dir = path.expanduser(cache_dir)
     self.local_roots = (
       path.join(cache_dir, 'documents'),
       path.join(cache_dir, 'templates')
@@ -342,12 +342,13 @@ class LiveFileSourceRsync(LiveFileSourceSSH):
   def __init__(self, name, ssh, data_dir, host=None, rsync_path=None, use_banner=False, **kw):
     self.ssh = ssh
     self.name = name
-    self.cache_dir = data_dir
+    self.cache_dir = path.expanduser(data_dir)
     self.local_roots = (
-      path.join(data_dir, 'documents'),
-      path.join(data_dir, 'templates')
+      path.join(self.cache_dir, 'documents'),
+      path.join(self.cache_dir, 'templates')
     )
     self._makeLocalPaths()
+    log.info("DATA STORED IN:\n\t%s\n\t%s", self.local_roots[0], self.local_roots[1])
 
     if use_banner:
       _,out,_ = ssh.exec_command("/bin/systemctl stop xochitl")
@@ -413,8 +414,12 @@ class LiveFileSourceRsync(LiveFileSourceSSH):
     return local
 
   def retrieveTemplate(self, name, progress=None, force=False, preferVector=False):
-    t = self._selectTemplate(name, preferVector)
-    return self._local(t, branch=TEMPLDIR)
+    try:
+      t = self._selectTemplate(name, preferVector)
+      return self._local(t, branch=TEMPLDIR)
+    except Exception:
+      log.warning("The template '%s' could not be loaded", name)
+      return None
 
   def prefetchMetadata(self, progress=None, force=False):
     self._bulk_download(self._remote(), self._local(), includes=['*.metadata', '*.content', '*.pagedata'])
