@@ -21,16 +21,32 @@ For a basic backup of the tablet's data:
     scp -rp REMARKABLEHOST:/home/root/.local/share/remarkable/xochitl .
 
 
-## Requirements
+## Installation
 
-Requires:
+The installation process is a bit less straightforward than ideal because `python-poppler-qt5` has [broken installation scripts](https://github.com/frescobaldi/python-poppler-qt5/pull/41).
 
-- arrow==0.15.6
-- paramiko==2.7.1
-- PyPDF2==1.26.0
-- PyQt5==5.14.2
-- python-poppler-qt5==0.75.0
-- simplification==0.5.1
+The requirements are:
+
+- requests
+- sip
+- arrow
+- paramiko
+- PyPDF2
+- PyQt5
+- simplification (this requires python < 3.9, but I plan to make this dependency optional)
+- python-poppler-qt5 (see below)
+
+The following works on MacOs (Catalina), assuming `python` version 3.8 (if not, use `pyenv` to install and manage Python versions):
+
+```bash
+# Build dependencies
+brew install cmake poppler
+# Install regular dependencies
+pip install requests arrow paramiko PyPDF2 PyQt5 simplification sip
+# Install python-poppler-qt5 using SIP5
+pip install git+https://github.com/mitya57/python-poppler-qt5.git@sip5
+```
+
 
 ## Usage
 
