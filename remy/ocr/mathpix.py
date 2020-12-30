@@ -3,13 +3,21 @@ import base64
 import requests
 import json
 
-from simplification.cutil import simplify_coords
+try:
 
-def simpl(stroke):
-  return simplify_coords([[s.x, s.y] for s in stroke.segments], 2.0)
+  from simplification.cutil import simplify_coords
+
+  def simpl(stroke):
+    return simplify_coords([[s.x, s.y] for s in stroke.segments], 2.0)
+
+except Exception:
+  simpl = None
 
 
 def mathpix(page, app_id, app_key, simplify=True, tools = [2, 15, 4, 17, 7, 13]):
+  if simpl is None:
+    simplify = False
+    log.warning("Simplification parameters ignored since the simplification library is not installed")
   x = []
   y = []
   for l in page.layers:

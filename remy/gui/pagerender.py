@@ -7,15 +7,20 @@ from PyQt5.QtPrintSupport import *
 
 import remy.remarkable.constants as rm
 
-from simplification.cutil import simplify_coords
-
 import time
 import logging
 log = logging.getLogger('remy')
 
+try:
 
-def simpl(stroke, tolerance=10.0):
-  return simplify_coords([[s.x, s.y] for s in stroke.segments], tolerance)
+  from simplification.cutil import simplify_coords
+
+  def simpl(stroke, tolerance=10.0):
+    return simplify_coords([[s.x, s.y] for s in stroke.segments], tolerance)
+
+except Exception:
+  simpl = None
+
 
 def flat_width(stroke, segment):
   return stroke.width
