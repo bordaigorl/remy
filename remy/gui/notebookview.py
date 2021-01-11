@@ -170,7 +170,7 @@ class NotebookViewer(QGraphicsView):
 
   def loadPage(self, i):
     T0 = time.perf_counter()
-    ermode = self.options.get("eraser_mode")
+    ermode = self.options.get("eraser_mode", "ignore")
     if i not in self._page_cache:
       self._page_cache[i] = self.makePageScene(i, eraser_mode=ermode)
     self.setScene(self._page_cache[i])
