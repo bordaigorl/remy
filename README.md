@@ -135,7 +135,9 @@ The `use_banner` setting is optional and described below.
   "key": "~/.ssh/id_rsa_remarkable",
   "username": "root",
   "timeout": 3,
-  "use_banner": "remy-banner.png"
+  "use_banner": "remy-banner.png",
+  "rsync_path": "/path/to/local/rsync",
+  "rsync_options": [ "--rsync-path=/opt/bin/rsync" ]
 }
 ```
 
@@ -145,6 +147,7 @@ Most settings are the same, you can also set `host` to your SSH-config alias for
 A mandatory setting is `data_dir` which should point to a directory which can be managed by reMy to keep a partial copy of the tablet's data.
 Every time you connect, only the changes are downloaded.
 The data-heavy files (PDFs and .rm) are downloaded on demand.
+The optional settings `rsync_path` provides the path to the local rsync binary and `rsync_options` provides additional options, the example above configures the options to find the rsync binary on the remarkable installed using entware.
 
 
 #### The `use_banner` option
