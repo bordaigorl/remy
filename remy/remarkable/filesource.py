@@ -336,10 +336,10 @@ class LiveFileSourceSSH(FileSource):
 
 class LiveFileSourceRsync(LiveFileSourceSSH):
 
-  RSYNC = 'rsync'
+  RSYNC = [ "rsync" ]
   _updated = {}
 
-  def __init__(self, name, ssh, data_dir, host=None, rsync_path=None, use_banner=False, **kw):
+  def __init__(self, name, ssh, data_dir, host=None, rsync_path=None, rsync_options=None, use_banner=False, **kw):
     self.ssh = ssh
     self.name = name
     self.cache_dir = path.expanduser(data_dir)
@@ -362,7 +362,12 @@ class LiveFileSourceRsync(LiveFileSourceSSH):
     self.host = host or ssh.address
     self.sftp = self.scp = ssh.open_sftp()  # for listing
     if rsync_path:
-      self.RSYNC = rsync_path
+      self.RSYNC = [ rsync_path ]
+    if rsync_options:
+      if type(rsync_options) == str:
+        self.RSYNC.append(rsync_options)
+      else:
+        self.RSYNC +=rsync_options
 
     self._bulk_download(
       self._remote(branch=TEMPLDIR),
@@ -383,7 +388,7 @@ class LiveFileSourceRsync(LiveFileSourceSSH):
         self.templates[name]['png'] = t["filename"] + '.png'
 
   def _bulk_download(self, fr, to, excludes=['*'], includes=[], delete=True):
-    cmd = [ self.RSYNC, '-vaz', '--prune-empty-dirs' ]
+    cmd = self.RSYNC + ['-vaz', '--prune-empty-dirs']
     if delete:
       cmd.append('--delete')
     for i in includes:
@@ -400,7 +405,7 @@ class LiveFileSourceRsync(LiveFileSourceSSH):
     dirname = path.dirname(to)
     if not path.isdir(dirname):
       os.makedirs(dirname)
-    return subprocess.run([self.RSYNC, '-zt', self.host + ':' + fr, to])
+    return subprocess.run(self.RSYNC + ['-zt', self.host + ':' + fr, to])
 
   def retrieve(self, *filename, ext=None, progress=None, force=False):
     if ext:
