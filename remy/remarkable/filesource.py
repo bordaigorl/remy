@@ -102,8 +102,9 @@ class LocalFileSource(FileSource):
   def __init__(self, name, root, templatesRoot=None):
     self.name = name
     self.root = root = path.expanduser(root)
-    self.templatesRoot = templatesRoot = path.expanduser(templatesRoot)
+    self.templatesRoot = None
     if templatesRoot:
+      self.templatesRoot = templatesRoot = path.expanduser(templatesRoot)
       self.templates = {}
       with open(path.join(templatesRoot, "templates.json"), 'r') as f:
         idx = json.load(f)
@@ -125,7 +126,11 @@ class LocalFileSource(FileSource):
     return path.join(self.root, *filename)
 
   def retrieveTemplate(self, name, progress=None, force=False, preferVector=False):
-    return path.join(self.templatesRoot, self._selectTemplate(name, preferVector))
+    try:
+      return path.join(self.templatesRoot, self._selectTemplate(name, preferVector))
+    except Exception:
+      log.warning("The template '%s' could not be loaded", name)
+      return None
 
   def prefetchMetadata(self, progress=None, force=False):
     pass
@@ -253,12 +258,16 @@ class LiveFileSourceSSH(FileSource):
     return cachep
 
   def retrieveTemplate(self, name, progress=None, force=False, preferVector=False):
-    filename = self._selectTemplate(name, preferVector)
-    cachep = self._local(filename, branch=TEMPLDIR)
-    if force or not path.isfile(cachep):
-      remp = self._remote(filename, branch=TEMPLDIR)
-      self.scp.get(remp, cachep)
-    return cachep
+    try:
+      filename = self._selectTemplate(name, preferVector)
+      cachep = self._local(filename, branch=TEMPLDIR)
+      if force or not path.isfile(cachep):
+        remp = self._remote(filename, branch=TEMPLDIR)
+        self.scp.get(remp, cachep)
+      return cachep
+    except Exception:
+      log.warning("The template '%s' could not be loaded", name)
+      return None
 
   def prefetchMetadata(self, progress=None, force=False):
     pass
