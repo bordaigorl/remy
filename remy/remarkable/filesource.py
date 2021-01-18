@@ -451,7 +451,13 @@ class LiveFileSourceRsync(LiveFileSourceSSH):
 
 # Factory
 
-def fileSourceFromSSH(cls, name="SSH", address='10.11.99.1', username='root', password=None, key=None, timeout=1, **kw):
+def fileSourceFromSSH(cls, name="SSH", address=None, host=None, username='root', password=None, key=None, timeout=1, **kw):
+  if not address:
+    if host:
+      address = host
+    else:
+      address = '10.11.99.1'
+
   # try:
     client = paramiko.SSHClient()
     client.load_system_host_keys()
@@ -482,7 +488,7 @@ def fileSourceFromSSH(cls, name="SSH", address='10.11.99.1', username='root', pa
     client.connect(address, **options)
     log.info("Connected to %s", address)
     client.address = address
-    return cls(name, client, **kw)
+    return cls(name, client, host=host, **kw)
   # except Exception as e:
   #   log.error("Could not connect to %s: %s", address, e)
   #   log.error("Please check your remarkable is connected and retry.")
