@@ -396,10 +396,6 @@ class LiveFileSourceRsync(LiveFileSourceSSH):
       cmd.append(e)
     cmd.append(self._remote_path(fr + "/"))
     cmd.append(to)
-    test = ""
-    for string in cmd:
-      test += " " + string
-    print(test)
     return subprocess.run(cmd)
 
   def _file_download(self, fr, to):
