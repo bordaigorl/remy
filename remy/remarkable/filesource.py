@@ -188,10 +188,13 @@ class LiveFileSourceSSH(FileSource):
     )
     self._makeLocalPaths()
 
+    _,out,_ = self.ssh.exec_command("echo $HOME")
+    out.channel.recv_exit_status()
+    _remote_home = out.read().decode().strip()
     if remote_documents:
-      self.remote_roots[0] = path.expanduser(remote_documents)
+      self.remote_roots[0] = self._expanduser_remote(remote_documents, _remote_home)
     if remote_templates:
-      self.remote_roots[1] = remote_templates
+      self.remote_roots[1] = self._expanduser_remote(remote_templates, _remote_home)
 
     if use_banner:
       _,out,_ = ssh.exec_command("/bin/systemctl stop xochitl")
@@ -222,6 +225,12 @@ class LiveFileSourceSSH(FileSource):
           self.templates[name]['svg'] = t["filename"] + '.svg'
         if self._isfile(fname + '.png'):
           self.templates[name]['png'] = t["filename"] + '.png'
+
+  def _expanduser_remote(self, path, home):
+    if path[0] == '~':
+      return home + path[1:]
+    else:
+      return path
 
   def _makeLocalPaths(self):
     for dirname in self.local_roots:
@@ -347,12 +356,20 @@ class LiveFileSourceRsync(LiveFileSourceSSH):
   RSYNC = [ which("rsync") ]
   _updated = {}
 
-  def __init__(self, name, ssh, data_dir, username="root", host="10.11.99.1", key=None, rsync_path=None, remote_documents=None, remote_templates=None, rsync_options=None, use_banner=False, **kw):
-    LiveFileSourceSSH.__init__(self, name, ssh, cache_dir=data_dir, use_banner=use_banner, remote_documents=remote_documents, remote_templates=remote_templates, connect=False)
+  def __init__(self, name, ssh, data_dir,
+               username="root", host="10.11.99.1", key=None,
+               rsync_path=None, rsync_options=None, remote_documents=None, remote_templates=None,
+               use_banner=False, cache_mode="on_demand", **kw):
+    LiveFileSourceSSH.__init__(self, name, ssh, cache_dir=data_dir,
+                               remote_documents=remote_documents, remote_templates=remote_templates,
+                               use_banner=use_banner, connect=False)
+
     log.info("DATA STORED IN:\n\t%s\n\t%s", self.local_roots[0], self.local_roots[1])
 
     self.host = host
     self.username = username
+    self.cache_mode = cache_mode
+
     if rsync_path:
       self.RSYNC = [ rsync_path ]
     if key:
@@ -381,8 +398,8 @@ class LiveFileSourceRsync(LiveFileSourceSSH):
       if path.isfile(fname + '.png'):
         self.templates[name]['png'] = t["filename"] + '.png'
 
-  def _remote_path(self, fr):
-    return "%s@%s:'%s'" % (self.username, self.host, fr)
+  def _remote_rsync(self, path):
+    return "%s@%s:'%s'" % (self.username, self.host, path)
 
   def _bulk_download(self, fr, to, excludes=['*'], includes=[], delete=True):
     cmd = self.RSYNC + ['-vaz', '--prune-empty-dirs']
@@ -394,7 +411,7 @@ class LiveFileSourceRsync(LiveFileSourceSSH):
     for e in excludes:
       cmd.append("--exclude")
       cmd.append(e)
-    cmd.append(self._remote_path(fr + "/"))
+    cmd.append(self._remote_rsync(fr + "/"))
     cmd.append(to)
     return subprocess.run(cmd)
 
@@ -402,7 +419,7 @@ class LiveFileSourceRsync(LiveFileSourceSSH):
     dirname = path.dirname(to)
     if not path.isdir(dirname):
       os.makedirs(dirname)
-    return subprocess.run(self.RSYNC + ['-zt', self._remote_path(fr), to])
+    return subprocess.run(self.RSYNC + ['-zt', self._remote_rsync(fr), to])
 
   def retrieve(self, *filename, ext=None, progress=None, force=False):
     if ext:
@@ -424,7 +441,16 @@ class LiveFileSourceRsync(LiveFileSourceSSH):
       return None
 
   def prefetchMetadata(self, progress=None, force=False):
-    self._bulk_download(self._remote(), self._local(), includes=['*.metadata', '*.content', '*.pagedata'])
+    if self.cache_mode == "full_mirror":
+      _excludes = [ ]
+      _includes = [ ]
+    elif self.cache_mode == "light_mirror":
+      _excludes = ['*.thumbnails']
+      _includes = [ ]
+    else:
+      _excludes = [ '*' ]
+      _includes = ['*.metadata', '*.content', '*.pagedata']
+    self._bulk_download(self._remote(), self._local(), includes=_includes, excludes=_excludes)
     with os.scandir(self._local()) as entries:
       for entry in entries:
         if entry.is_file():
