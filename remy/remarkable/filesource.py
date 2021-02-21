@@ -190,11 +190,10 @@ class LiveFileSourceSSH(FileSource):
 
     _,out,_ = self.ssh.exec_command("echo $HOME")
     out.channel.recv_exit_status()
-    _remote_home = out.read().decode().strip()
     if remote_documents:
-      self.remote_roots[0] = self._expanduser_remote(remote_documents, _remote_home)
+      self.remote_roots[0] = remote_documents
     if remote_templates:
-      self.remote_roots[1] = self._expanduser_remote(remote_templates, _remote_home)
+      self.remote_roots[1] = remote_templates
 
     if use_banner:
       _,out,_ = ssh.exec_command("/bin/systemctl stop xochitl")
@@ -225,12 +224,6 @@ class LiveFileSourceSSH(FileSource):
           self.templates[name]['svg'] = t["filename"] + '.svg'
         if self._isfile(fname + '.png'):
           self.templates[name]['png'] = t["filename"] + '.png'
-
-  def _expanduser_remote(self, path, home):
-    if path[0] == '~':
-      return home + path[1:]
-    else:
-      return path
 
   def _makeLocalPaths(self):
     for dirname in self.local_roots:

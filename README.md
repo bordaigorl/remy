@@ -122,7 +122,7 @@ or via WiFi, in which case you need to find the address assigned to the tablet o
 Most settings are optional, you can also use `password` instead of `key`.
 The option "host" falls back to the USB configuration "10.11.99.1".
 The `use_banner` setting is optional and described below.
-
+It is possible to specify `remote_documents` and `remote_templates`, these paths need to be absolute ("~" expansion does not work).
 
 #### Rsync source
 
