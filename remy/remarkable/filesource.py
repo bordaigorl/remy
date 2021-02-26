@@ -5,6 +5,7 @@ import os.path as path
 import json
 from stat import S_ISREG, S_ISDIR
 import subprocess
+from shutil import which
 
 import logging
 log = logging.getLogger('remy')
@@ -172,24 +173,32 @@ TEMPLDIR = 1
 
 class LiveFileSourceSSH(FileSource):
 
-  remote_roots = (
+  remote_roots = [
     '/home/root/.local/share/remarkable/xochitl',
     '/usr/share/remarkable/templates'
-  )
+  ]
 
   _allUids = None
 
   _dirty = False
 
-  def __init__(self, name, ssh, cache_dir=None, use_banner=False, **kw):
+  def __init__(self, name, ssh, cache_dir=None, username=None, remote_documents=None, remote_templates=None, use_banner=False, connect=True, **kw):
     self.ssh = ssh
     self.name = name
+
     self.cache_dir = cache_dir = path.expanduser(cache_dir)
     self.local_roots = (
       path.join(cache_dir, 'documents'),
       path.join(cache_dir, 'templates')
     )
     self._makeLocalPaths()
+
+    _,out,_ = self.ssh.exec_command("echo $HOME")
+    out.channel.recv_exit_status()
+    if remote_documents:
+      self.remote_roots[0] = remote_documents
+    if remote_templates:
+      self.remote_roots[1] = remote_templates
 
     if use_banner:
       _,out,_ = ssh.exec_command("/bin/systemctl stop xochitl")
@@ -205,20 +214,21 @@ class LiveFileSourceSSH(FileSource):
     # self.scp = SCPClient(ssh.get_transport())
 
     self.templates = {}
-    self.scp.get( self._remote("templates.json", branch=TEMPLDIR)
-                , self._local ("templates.json", branch=TEMPLDIR) )
-    with open(self._local("templates.json", branch=TEMPLDIR), 'r') as f:
-      idx = json.load(f)
 
-    for t in idx["templates"]:
-      name = t["filename"] # "name" is just for display, not for lookup!!!
-      fname = self._remote(t["filename"], branch=TEMPLDIR)
-      self.templates[name] = {}
-      if self._isfile(fname + '.svg'):
-        self.templates[name]['svg'] = t["filename"] + '.svg'
-      if self._isfile(fname + '.png'):
-        self.templates[name]['png'] = t["filename"] + '.png'
+    if connect:
+      self.scp.get( self._remote("templates.json", branch=TEMPLDIR)
+                    , self._local ("templates.json", branch=TEMPLDIR) )
+      with open(self._local("templates.json", branch=TEMPLDIR), 'r') as f:
+        idx = json.load(f)
 
+      for t in idx["templates"]:
+        name = t["filename"] # "name" is just for display, not for lookup!!!
+        fname = self._remote(t["filename"], branch=TEMPLDIR)
+        self.templates[name] = {}
+        if self._isfile(fname + '.svg'):
+          self.templates[name]['svg'] = t["filename"] + '.svg'
+        if self._isfile(fname + '.png'):
+          self.templates[name]['png'] = t["filename"] + '.png'
 
   def _makeLocalPaths(self):
     for dirname in self.local_roots:
@@ -345,33 +355,28 @@ class LiveFileSourceSSH(FileSource):
 
 class LiveFileSourceRsync(LiveFileSourceSSH):
 
-  RSYNC = [ "rsync" ]
+  RSYNC = [ which("rsync") ]
   _updated = {}
 
-  def __init__(self, name, ssh, data_dir, host=None, rsync_path=None, rsync_options=None, use_banner=False, **kw):
-    self.ssh = ssh
-    self.name = name
-    self.cache_dir = path.expanduser(data_dir)
-    self.local_roots = (
-      path.join(self.cache_dir, 'documents'),
-      path.join(self.cache_dir, 'templates')
-    )
-    self._makeLocalPaths()
+  def __init__(self, name, ssh, data_dir,
+               username="root", host="10.11.99.1", key=None,
+               rsync_path=None, rsync_options=None, remote_documents=None, remote_templates=None,
+               use_banner=False, cache_mode="on_demand", **kw):
+    LiveFileSourceSSH.__init__(self, name, ssh, cache_dir=data_dir,
+                               remote_documents=remote_documents, remote_templates=remote_templates,
+                               use_banner=use_banner, connect=False)
+
     log.info("DATA STORED IN:\n\t%s\n\t%s", self.local_roots[0], self.local_roots[1])
 
-    if use_banner:
-      _,out,_ = ssh.exec_command("/bin/systemctl stop xochitl")
-      if out.channel.recv_exit_status() == 0:
-        self._dirty = True
-        _,out,_ = ssh.exec_command("$HOME/remarkable-splash '%s'" % use_banner)
-        out.channel.recv_exit_status()
-      else:
-        log.warning("I could not stop xochitl")
+    self.host = host
+    self.username = username
+    self.cache_mode = cache_mode
 
-    self.host = host or ssh.address
-    self.sftp = self.scp = ssh.open_sftp()  # for listing
     if rsync_path:
       self.RSYNC = [ rsync_path ]
+    if key:
+      self.RSYNC.append("-e")
+      self.RSYNC.append("%s -i \"%s\"" % (which("ssh"), key))
     if rsync_options:
       if type(rsync_options) == str:
         self.RSYNC.append(rsync_options)
@@ -383,7 +388,6 @@ class LiveFileSourceRsync(LiveFileSourceSSH):
       self._local (branch=TEMPLDIR),
       excludes=[])
 
-    self.templates = {}
     with open(self._local("templates.json", branch=TEMPLDIR), 'r') as f:
       idx = json.load(f)
 
@@ -396,6 +400,9 @@ class LiveFileSourceRsync(LiveFileSourceSSH):
       if path.isfile(fname + '.png'):
         self.templates[name]['png'] = t["filename"] + '.png'
 
+  def _remote_rsync(self, path):
+    return "%s@%s:'%s'" % (self.username, self.host, path)
+
   def _bulk_download(self, fr, to, excludes=['*'], includes=[], delete=True):
     cmd = self.RSYNC + ['-vaz', '--prune-empty-dirs']
     if delete:
@@ -406,7 +413,7 @@ class LiveFileSourceRsync(LiveFileSourceSSH):
     for e in excludes:
       cmd.append("--exclude")
       cmd.append(e)
-    cmd.append("%s:'%s/'" % (self.host, fr))
+    cmd.append(self._remote_rsync(fr + "/"))
     cmd.append(to)
     return subprocess.run(cmd)
 
@@ -414,7 +421,7 @@ class LiveFileSourceRsync(LiveFileSourceSSH):
     dirname = path.dirname(to)
     if not path.isdir(dirname):
       os.makedirs(dirname)
-    return subprocess.run(self.RSYNC + ['-zt', self.host + ':' + fr, to])
+    return subprocess.run(self.RSYNC + ['-zt', self._remote_rsync(fr), to])
 
   def retrieve(self, *filename, ext=None, progress=None, force=False):
     if ext:
@@ -436,7 +443,16 @@ class LiveFileSourceRsync(LiveFileSourceSSH):
       return None
 
   def prefetchMetadata(self, progress=None, force=False):
-    self._bulk_download(self._remote(), self._local(), includes=['*.metadata', '*.content', '*.pagedata'])
+    if self.cache_mode == "full_mirror":
+      _excludes = [ ]
+      _includes = [ ]
+    elif self.cache_mode == "light_mirror":
+      _excludes = ['*.thumbnails']
+      _includes = [ ]
+    else:
+      _excludes = [ '*' ]
+      _includes = ['*.metadata', '*.content', '*.pagedata']
+    self._bulk_download(self._remote(), self._local(), includes=_includes, excludes=_excludes)
     with os.scandir(self._local()) as entries:
       for entry in entries:
         if entry.is_file():
@@ -460,7 +476,7 @@ class LiveFileSourceRsync(LiveFileSourceSSH):
 
 # Factory
 
-def fileSourceFromSSH(cls, name="SSH", address='10.11.99.1', username='root', password=None, key=None, timeout=1, **kw):
+def fileSourceFromSSH(cls, name="SSH", host='10.11.99.1', username='root', password=None, key=None, timeout=1, **kw):
   # try:
     client = paramiko.SSHClient()
     client.load_system_host_keys()
@@ -476,22 +492,20 @@ def fileSourceFromSSH(cls, name="SSH", address='10.11.99.1', username='root', pa
         else:
           raise Exception("A passphrase for SSH key is required")
     else:
-      pkey = None
-      if password is None:
-        raise Exception("Must provide either password or SSH key")
+      # as a last option we can try to let paramiko handle the keys
+      pkey=None
 
     options = {
       'username': username,
       'password': password,
       'pkey': pkey,
       'timeout': timeout,
-      'look_for_keys': False
+      'look_for_keys': pkey is None
     }
     log.info('Connecting...') # pkey=key,
-    client.connect(address, **options)
-    log.info("Connected to %s", address)
-    client.address = address
-    return cls(name, client, **kw)
+    client.connect(host, **options)
+    log.info("Connected to %s", host)
+    return cls(name, client, username=username, host=host, key=key, **kw)
   # except Exception as e:
   #   log.error("Could not connect to %s: %s", address, e)
   #   log.error("Please check your remarkable is connected and retry.")
