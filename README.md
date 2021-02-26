@@ -106,7 +106,7 @@ Obviously, this source is read-only: you cannot upload PDFs to it.
 {
   "name": "reMarkable (WiFi)",
   "type": "ssh",
-  "address": "192.168.1.154",
+  "host": "192.168.1.154",
   "key": "~/.ssh/id_rsa_remarkable",
   "username": "root",
   "timeout": 3,
@@ -116,12 +116,13 @@ Obviously, this source is read-only: you cannot upload PDFs to it.
 
 The SSH-type source connects to the tabled via SSH.
 The tablet needs to be either plugged via USB
-(in which case you should set `"address": "10.11.99.1"`)
-or via WiFi, in which case you need to find the address assigned to the tablet in the "About" section of the tablet's settings.
+(in which case you should set `"host": "10.11.99.1"`)
+or via WiFi, in which case you need to find the address assigned to the tablet or you can use the hostname "reMarkable" 
+(if your router supports hostname resolution) in the "About" section of the tablet's settings.
 Most settings are optional, you can also use `password` instead of `key`.
-Address is mandatory.
+The option "host" falls back to the USB configuration "10.11.99.1".
 The `use_banner` setting is optional and described below.
-
+It is possible to specify `remote_documents` and `remote_templates`, these paths need to be absolute ("~" expansion does not work).
 
 #### Rsync source
 
@@ -130,8 +131,7 @@ The `use_banner` setting is optional and described below.
   "name": "reMarkable (RSync)",
   "type": "rsync",
   "data_dir": "/path-to/remy",
-  "address": "10.11.99.1",
-  "host": "rm",
+  "host": "10.11.99.1",
   "key": "~/.ssh/id_rsa_remarkable",
   "username": "root",
   "timeout": 3,
@@ -143,7 +143,6 @@ The `use_banner` setting is optional and described below.
 
 This is an optimised version of the SSH source.
 While SSH works without extra dependencies, the rsync source requires `rsync` to be installed on the reMarkable.
-Most settings are the same, you can also set `host` to your SSH-config alias for the remarkable.
 A mandatory setting is `data_dir` which should point to a directory which can be managed by reMy to keep a partial copy of the tablet's data.
 Every time you connect, only the changes are downloaded.
 The data-heavy files (PDFs and .rm) are downloaded on demand.
