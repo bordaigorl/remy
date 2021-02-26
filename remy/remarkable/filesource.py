@@ -491,7 +491,7 @@ def fileSourceFromSSH(cls, name="SSH", host='10.11.99.1', username='root', passw
       'password': password,
       'pkey': pkey,
       'timeout': timeout,
-      'look_for_keys': pkey is not None
+      'look_for_keys': pkey is None
     }
     log.info('Connecting...') # pkey=key,
     client.connect(host, **options)
