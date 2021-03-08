@@ -8,7 +8,7 @@
       "key": "~/.ssh/id_rsa",
       "username": "root",
       "timeout": 3,
-      "use_banner": "remy-banner.png",
+      "use_banner": "remy-banner.png"
     },
     "wifi": {
       "name": "reMarkable (RSync)",
