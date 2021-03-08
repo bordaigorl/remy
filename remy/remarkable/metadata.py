@@ -611,7 +611,7 @@ class RemarkableIndex:
     print(uid)
     meta = PDF_BASE_METADATA.copy()
     meta.setdefault('visibleName', os.path.splitext(os.path.basename(pdf))[0])
-    meta.setdefault('lastModified', str(arrow.utcnow().timestamp * 1000))
+    meta.setdefault('lastModified', str(arrow.utcnow().int_timestamp * 1000))
     meta.update(metadata)
 
     cont = PDF_BASE_CONTENT.copy()
