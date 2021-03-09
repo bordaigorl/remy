@@ -131,6 +131,10 @@ class PageGraphicsItem(QGraphicsRectItem):
         QColor(colors.get('white', DEFAULT_COLORS[2])),
       ]
 
+    if simpl is None:
+      simplify = 0
+      log.warning("Simplification parameters ignored since the simplification library is not installed")
+
     noPen = QPen(Qt.NoPen)
     noPen.setWidth(0)
     self.setPen(noPen)
