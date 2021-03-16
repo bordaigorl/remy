@@ -9,7 +9,7 @@ import remy.remarkable.constants as rm
 from remy.ocr.mathpix import mathpix
 
 from remy.gui.pagerender import PageGraphicsItem, BarePageScene
-from remy.gui.export import ExportOperation, WebUIExport, ExportDialog
+from remy.gui.export import webUIExport, exportDocument
 
 from os import path
 
@@ -275,37 +275,10 @@ class NotebookViewer(QGraphicsView):
     self.rotate(self._rotation)
 
   def export(self):
-    ok = True
-    opt = QApplication.instance().config.get("export", {})
-    filename = self.document.visibleName
-    if not filename.endswith(".pdf"):
-      filename += ".pdf"
-    filename = path.join(opt.get("default_dir", ""), filename)
-    # filename, ok = QFileDialog.getSaveFileName(self, "Export PDF...", filename)
-    filename, whichPages, opt, ok = ExportDialog.getFileExportOptions(filename=filename, options=opt, parent=self)
-    if ok:
-      op = ExportOperation(parent=self)
-      if opt.pop("open_exported", True):
-        op.success.connect(lambda: QDesktopServices.openUrl(QUrl("file://" + filename)))
-      op.run(filename, self.document, whichPages=whichPages, **opt)
+    exportDocument(self.document, self)
 
   def webUIExport(self, filename=None):
-    ok = True
-    opt = QApplication.instance().config.get("export", {})
-    if filename is None:
-      filename = self.document.visibleName
-      if not filename.endswith(".pdf"):
-        filename += ".pdf"
-      filename = path.join(opt.get("default_dir", ""), filename)
-      filename, ok = QFileDialog.getSaveFileName(self, "Export PDF...", filename)
-    if ok and filename:
-      try:
-        op = WebUIExport(parent=self)
-        op.run(filename, self.document.uid)
-        if opt.pop("open_exported", True):
-          QDesktopServices.openUrl(QUrl("file://" + filename))
-      except:
-        QMessageBox.critical(self, "Error", "Could not download PDF from WebUI.\nThis feature only works with USB connections.")
+    webUIExport(self.document, filename, self)
 
   def mathpix(self, pageNum=None, simplify=True):
     if pageNum is None:

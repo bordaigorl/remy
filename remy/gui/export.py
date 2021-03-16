@@ -527,3 +527,40 @@ class ExportDialog(QDialog):
         }
       }
     )
+
+def exportDocument(doc, parent=None):
+  ok = True
+  opt = QApplication.instance().config.get("export", {})
+  filename = doc.visibleName
+  if not filename.endswith(".pdf"):
+    filename += ".pdf"
+  filename = path.join(opt.get("default_dir", ""), filename)
+  # filename, ok = QFileDialog.getSaveFileName(parent, "Export PDF...", filename)
+  filename, whichPages, opt, ok = ExportDialog.getFileExportOptions(filename=filename, options=opt, parent=parent)
+  if ok:
+    op = ExportOperation(parent=parent)
+    if opt.pop("open_exported", True):
+      op.success.connect(lambda: QDesktopServices.openUrl(QUrl("file://" + filename)))
+    op.run(filename, doc, whichPages=whichPages, **opt)
+    return op
+  return None
+
+def webUIExport(doc, filename=None, parent=None):
+  ok = True
+  opt = QApplication.instance().config.get("export", {})
+  if filename is None:
+    filename = doc.visibleName
+    if not filename.endswith(".pdf"):
+      filename += ".pdf"
+    filename = path.join(opt.get("default_dir", ""), filename)
+    filename, ok = QFileDialog.getSaveFileName(parent, "Export PDF...", filename)
+  if ok and filename:
+    try:
+      op = WebUIExport(parent=parent)
+      op.run(filename, doc.uid)
+      if opt.pop("open_exported", True):
+        QDesktopServices.openUrl(QUrl("file://" + filename))
+      return True
+    except:
+      QMessageBox.critical(parent, "Error", "Could not download PDF from WebUI.\nThis feature only works with USB connections.")
+  return False
