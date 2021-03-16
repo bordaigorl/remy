@@ -42,7 +42,7 @@ def _progress(p, i, t):
     p(i, t)
 
 
-DEFAULT_COLORS = [Qt.black, Qt.gray, Qt.white]
+DEFAULT_COLORS = [Qt.black, QColor('#bbbbbb'), Qt.white]
 DEFAULT_HIGHLIGHT = QColor(255,235,147, 80)
 
 QUICK_ERASER    = 0
