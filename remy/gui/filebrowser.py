@@ -11,6 +11,7 @@ from remy.gui.notebookview import *
 import logging
 log = logging.getLogger('remy')
 
+from remy.gui.export import webUIExport, exportDocument
 
 
 class DropBox(QLabel):
@@ -294,7 +295,7 @@ class DocTreeItem(QTreeWidgetItem):
 
 class DocTree(QTreeWidget):
 
-  selectionCleared = pyqtSignal()
+  contextMenu = pyqtSignal(object,QContextMenuEvent)
 
   def __init__(self, index, *a, uid=None, show_trash=True, **kw):
     super(DocTree, self).__init__(*a, **kw)
@@ -326,6 +327,7 @@ class DocTree(QTreeWidget):
     nodes = self._nodes = {}
     if uid is None:
       uid = index.root().uid
+    self._rootEntry = index.get(uid)
     p = nodes[uid] = self
     for f in index.scanFolders(uid):
       p = nodes[f.uid]
@@ -350,12 +352,34 @@ class DocTree(QTreeWidget):
       uid = uid.uid
     return self._nodes.get(uid)
 
+  def currentEntry(self):
+    cur = self.currentItem()
+    if cur is None:
+      return self._rootEntry
+    else:
+      return cur.entry()
+
   def mouseReleaseEvent(self, event):
     i = self.indexAt(event.pos())
     QTreeView.mouseReleaseEvent(self, event)
     if not i.isValid():
-      self.clearSelection()
-      self.selectionCleared.emit()
+      # self.clearSelection()
+      self.setCurrentItem(None)
+      # self.selectionCleared.emit()
+
+  def contextMenuEvent(self, event):
+    i = self.indexAt(event.pos())
+    if i.isValid():
+      item = self.itemFromIndex(i)
+      self.setCurrentItem(item)
+      self.contextMenu.emit(item, event)
+    else:
+      # self.clearSelection()
+      self.setCurrentItem(None)
+      # self.selectionCleared.emit()
+      self.contextMenu.emit(None, event)
+
+# TODO: doctree.index, emit root if no item, store item on event and fetch it when triggering actions
 
   def indexUpdated(self, success, action, entries, index, extra):
     if success:
@@ -379,6 +403,7 @@ class DocTree(QTreeWidget):
 class FileBrowser(QMainWindow):
 
   def __init__(self, index, *args, **kwargs):
+    # self.bar = QMenuBar()
     super().__init__(*args, **kwargs)
     self.index = index
 
@@ -388,7 +413,7 @@ class FileBrowser(QMainWindow):
 
     tree = self.tree = DocTree(index, splitter)
     info = self.info = InfoPanel(index, splitter)
-    info.setEntry(index.root())
+    # info.setEntry(index.root())
     info.uploadRequest.connect(self._import)
     splitter.setCollapsible(1,True)
 
@@ -396,11 +421,11 @@ class FileBrowser(QMainWindow):
     # def onsel(cur, prev):
     #   info.setText(cur.internalPointer())
 
-    tree.itemDoubleClicked.connect(self.openEntry)
-    tree.itemClicked.connect(self.entryClicked)
+    tree.itemActivated.connect(self.openEntry)
+    tree.currentItemChanged.connect(self.entrySelected)
+    tree.contextMenu.connect(self.contextMenu)
 
-    # tree.clicked.connect(self.entryClicked)
-    tree.selectionCleared.connect(self.selClear)
+    # tree.selectionCleared.connect(self.selClear)
 
     self.viewers = {}
 
@@ -417,6 +442,37 @@ class FileBrowser(QMainWindow):
     splitter.setStretchFactor(0,2)
     splitter.setStretchFactor(1,1)
 
+    # Todo: actions fields, menu per entry type (folder, pdf, nb, epub)
+    self.documentMenu = QMenu(self)
+    self.folderMenu = QMenu(self)
+    ###
+    self.previewAction = QAction('Preview', self.tree)
+    self.previewAction.setShortcut("Enter")
+    self.previewAction.triggered.connect(self.openCurrentEntry)
+    #
+    self.exportAction = QAction('Export...', self.tree)
+    self.exportAction.setShortcut(QKeySequence.Save)
+    self.exportAction.triggered.connect(self.exportCurrentEntry)
+    # #
+    # self.deleteAction = QAction('Move to Trash', self.tree)
+    # self.deleteAction.setShortcut(QKeySequence.Delete)
+    # self.deleteAction.triggered.connect(self.deleteEntry)
+    #
+    self.importAction = QAction('&Import...', self.tree)
+    self.importAction.setShortcut("Ctrl+I")
+    self.importAction.triggered.connect(self.importIntoCurrentEntry)
+    ###
+    self.documentMenu.addAction(self.previewAction)
+    # self.documentMenu.addSeparator()
+    self.documentMenu.addAction(self.exportAction)
+    # self.documentMenu.addAction(self.deleteAction)
+    ###
+    if True:#not index.isReadOnly():
+      self.folderMenu.addAction(self.importAction)
+
+    self.tree.setCurrentItem(None)
+    self.entrySelected(None,None)
+
   @pyqtSlot(str, list,list)
   def _import(self, p, dirs, files):
     cont = QApplication.instance().config.get("import",{}).get("default_options",{})
@@ -428,24 +484,37 @@ class FileBrowser(QMainWindow):
     i = self.tree.itemOf(uid)
     self.tree.scrollToItem(i)
     self.tree.setCurrentItem(i) #, 0, QItemSelectionModel.ClearAndSelect)
-    self.info.setEntry(uid)
+    # self.info.setEntry(uid)
 
+  # @pyqtSlot()
+  # def selClear(self):
+  #   print(self.tree.currentItem())
+  #   self.info.setEntry(self.index.root())
 
-  @pyqtSlot()
-  def selClear(self):
-    self.info.setEntry(self.index.root())
-
-  @pyqtSlot(QTreeWidgetItem)
-  def entryClicked(self, cur):
-    entry = cur.entry()
-    if entry is None:
-      return
-      # entry = self.index.root()
+  @pyqtSlot(QTreeWidgetItem,QTreeWidgetItem)
+  def entrySelected(self, cur, prev):
+    entry = self.tree.currentEntry()
     self.info.setEntry(entry)
 
 
-  @pyqtSlot(QTreeWidgetItem)
-  def openEntry(self, item):
+  @pyqtSlot(object,QContextMenuEvent)
+  def contextMenu(self, item, event):
+    entry = self.tree.currentEntry()
+    if isinstance(entry, Folder):
+      if not isinstance(entry, TrashBin):
+        self.folderMenu.popup(self.tree.mapToGlobal(event.pos()))
+    else:
+      self.documentMenu.popup(self.tree.mapToGlobal(event.pos()))
+
+
+  @pyqtSlot()
+  def openCurrentEntry(self):
+    item = self.tree.currentItem()
+    if item:
+      self.openEntry(item, 0)
+
+  @pyqtSlot(QTreeWidgetItem,int)
+  def openEntry(self, item, col=0):
     uid = item.entry().uid
     index = self.index
     if not index.isOfType(uid, FOLDER):
@@ -455,3 +524,17 @@ class FileBrowser(QMainWindow):
       win.show()
       win.raise_()
       win.activateWindow()
+
+  @pyqtSlot()
+  def exportCurrentEntry(self):
+    entry = self.tree.currentEntry()
+    if entry:
+      exportDocument(entry, self)
+
+  @pyqtSlot()
+  def importIntoCurrentEntry(self):
+    entry = self.tree.currentEntry()
+    if entry and not entry.index.isReadOnly():
+      filenames, ok = QFileDialog.getOpenFileNames(self, "Select files to import")
+      if ok and filenames:
+        self._import(entry.uid, [], filenames)
