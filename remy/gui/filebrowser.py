@@ -467,7 +467,7 @@ class FileBrowser(QMainWindow):
     self.documentMenu.addAction(self.exportAction)
     # self.documentMenu.addAction(self.deleteAction)
     ###
-    if True:#not index.isReadOnly():
+    if not index.isReadOnly():
       self.folderMenu.addAction(self.importAction)
 
     self.tree.setCurrentItem(None)
