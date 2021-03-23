@@ -295,7 +295,7 @@ class DocTreeItem(QTreeWidgetItem):
 
 class DocTree(QTreeWidget):
 
-  contextMenu = pyqtSignal(object,QContextMenuEvent)
+  contextMenu = pyqtSignal(QTreeWidgetItem,QContextMenuEvent)
 
   def __init__(self, index, *a, uid=None, show_trash=True, **kw):
     super(DocTree, self).__init__(*a, **kw)
@@ -328,7 +328,7 @@ class DocTree(QTreeWidget):
     if uid is None:
       uid = index.root().uid
     self._rootEntry = index.get(uid)
-    p = nodes[uid] = self
+    p = nodes[uid] = self.invisibleRootItem()
     for f in index.scanFolders(uid):
       p = nodes[f.uid]
       for d in f.files:
@@ -363,23 +363,16 @@ class DocTree(QTreeWidget):
     i = self.indexAt(event.pos())
     QTreeView.mouseReleaseEvent(self, event)
     if not i.isValid():
-      # self.clearSelection()
-      self.setCurrentItem(None)
-      # self.selectionCleared.emit()
+      self.setCurrentItem(self.invisibleRootItem())
 
   def contextMenuEvent(self, event):
     i = self.indexAt(event.pos())
     if i.isValid():
       item = self.itemFromIndex(i)
-      self.setCurrentItem(item)
-      self.contextMenu.emit(item, event)
     else:
-      # self.clearSelection()
-      self.setCurrentItem(None)
-      # self.selectionCleared.emit()
-      self.contextMenu.emit(None, event)
-
-# TODO: doctree.index, emit root if no item, store item on event and fetch it when triggering actions
+      item = self.invisibleRootItem()
+    self.setCurrentItem(item)
+    self.contextMenu.emit(item, event)
 
   def indexUpdated(self, success, action, entries, index, extra):
     if success:
@@ -470,8 +463,9 @@ class FileBrowser(QMainWindow):
     if not index.isReadOnly():
       self.folderMenu.addAction(self.importAction)
 
-    self.tree.setCurrentItem(None)
-    self.entrySelected(None,None)
+    rootitem = self.tree.invisibleRootItem()
+    self.tree.setCurrentItem(rootitem)
+    self.entrySelected(rootitem,rootitem)
 
   @pyqtSlot(str, list,list)
   def _import(self, p, dirs, files):
@@ -497,7 +491,7 @@ class FileBrowser(QMainWindow):
     self.info.setEntry(entry)
 
 
-  @pyqtSlot(object,QContextMenuEvent)
+  @pyqtSlot(QTreeWidgetItem,QContextMenuEvent)
   def contextMenu(self, item, event):
     entry = self.tree.currentEntry()
     if isinstance(entry, Folder):
