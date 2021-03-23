@@ -70,6 +70,9 @@ class Entry:
   def name(self):
     return self._metadata.get('visibleName')
 
+  def isDeleted(self):
+    return self.index.isDeleted(self.uid)
+
   def updatedOn(self):
     try:
       updated = arrow.get(int(self.lastModified)/1000).humanize()
@@ -166,6 +169,9 @@ class TrashBin(Folder):
 
   def append(self, entry):
     self.files.append(entry)
+
+  def items(self):
+    yield from self.files
 
 
 class Document(Entry):
@@ -407,7 +413,7 @@ class RemarkableIndex:
   def allUids(self, trashToo=False):
     yield from self._uids
     if trashToo:
-      yield from self.trash
+      yield from self.trash.items()
 
   def ancestry(self,uid,exact=True):
     if not exact:
@@ -520,7 +526,7 @@ class RemarkableIndex:
       if k.startswith(pid):
         return k
     if trashToo:
-      for k in self.trash:
+      for k in self.trash.items():
         if k.startswith(pid):
           return k
     return None
@@ -530,7 +536,7 @@ class RemarkableIndex:
       uid = self.match_id(uid)
     p = []
     while uid:
-      if uid in self.index and (trash_too or uid not in self.trash):
+      if uid in self.index and (trash_too or uid not in self.trash.items()):
           p.append(self.index[uid].visibleName)
           uid = self.index[uid].parent
       else:
@@ -565,7 +571,7 @@ class RemarkableIndex:
                 if uid in self.index else None)
 
   def isDeleted(self, uid):
-    return uid in self.trash
+    return uid in self.trash.items()
 
   def __getattr__(self, field):
     if field.endswith("Of"):
