@@ -471,6 +471,8 @@ class RemarkableIndex:
     mask = mask & ANYTHING
     if uid == "":
       return bool(mask & FOLDER) and not (mask & DELETED)
+    if uid == TRASH_ID:
+      return bool(mask & FOLDER)
     if uid not in self.index:
       return None
     t = 0
@@ -488,7 +490,7 @@ class RemarkableIndex:
 
   def typeOf(self, uid):
     # Usage: bool(index.typeOf(uid) & NOTEBOOK)
-    if uid == "":
+    if uid == "" or uid == TRASH_ID:
       return FOLDER
     if uid not in self.index:
       return None
