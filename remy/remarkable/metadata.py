@@ -85,7 +85,7 @@ class Entry:
     return default
 
   def __getattr__(self, field):
-    if field == "fsource":
+    if field == "fsource" and self.index:
       return self.index.fsource
     if field in self._metadata:
       return self._metadata[field]
@@ -635,7 +635,7 @@ class RemarkableIndex:
       self.fsource.store('', uid + '.pagedata')
       self.fsource.makeDir(uid)
 
-      self.index[uid] = d = PDFDoc(self.fsource, uid, meta, cont)
+      self.index[uid] = d = PDFDoc(self, uid, meta, cont)
       self.index[d.parent].files.append(uid)
 
       self._broadcast(action=self.ADD, entries=[uid])
