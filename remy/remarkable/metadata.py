@@ -50,10 +50,15 @@ METADATA = 1
 CONTENT = 2
 BOTH = 3
 
+# TODO:
+# - MoveTo method of index (special case for trash, take care of deleted field)
+# - Consider an `update` method for Entry, triggering a save of json files on tablet
+
+
 class Entry:
 
-  def __init__(self, fsource, uid, metadata={}, content={}):
-    self.fsource   = fsource
+  def __init__(self, index, uid, metadata={}, content={}):
+    self.index   = index
     self.uid       = uid
     self._metadata  = metadata
     self._content   = content
@@ -80,6 +85,8 @@ class Entry:
     return default
 
   def __getattr__(self, field):
+    if field == "fsource":
+      return self.index.fsource
     if field in self._metadata:
       return self._metadata[field]
     if field in self._content:
@@ -127,9 +134,9 @@ TRASH_ID = 'trash'
 
 class RootFolder(Folder):
 
-  def __init__(self, fsource, **kw):
-    self.fsource   = fsource
-    self.uid       = ROOT_ID
+  def __init__(self, index, **kw):
+    self.index = index
+    self.uid = ROOT_ID
     self._metadata  = {
       'visibleName': 'reMarkable',
       'parent': None,
@@ -145,8 +152,9 @@ class RootFolder(Folder):
 
 class TrashBin(Folder):
 
-  def __init__(self, **kw):
-    self.uid       = TRASH_ID
+  def __init__(self, index, **kw):
+    self.index = index
+    self.uid = TRASH_ID
     self._metadata  = {
       'visibleName': 'Trash',
       'parent': None,
@@ -320,26 +328,26 @@ class RemarkableIndex:
   def __init__(self, fsource):
     self.fsource = fsource
     self._uids = list(fsource.listItems())
-    index = {ROOT_ID: RootFolder(fsource)}
+    index = {ROOT_ID: RootFolder(self)}
 
     for j, uid in enumerate(self._uids):
       print('%d%%' % (j * 100 // len(self._uids)), end='\r',flush=True)
       metadata = self._readJson(uid, ext='metadata')
       content  = self._readJson(uid, ext='content')
       if metadata["type"] == FOLDER_TYPE:
-        index[uid] = Folder(fsource, uid, metadata, content)
+        index[uid] = Folder(self, uid, metadata, content)
       elif metadata["type"] == DOCUMENT_TYPE:
         if content["fileType"] in ["", "notebook"]:
-          index[uid] = Notebook(fsource, uid, metadata, content)
+          index[uid] = Notebook(self, uid, metadata, content)
         elif content["fileType"] == "pdf":
-          index[uid] = PDFDoc(fsource, uid, metadata, content)
+          index[uid] = PDFDoc(self, uid, metadata, content)
         elif content["fileType"] == "epub":
-          index[uid] = EBook(fsource, uid, metadata, content)
+          index[uid] = EBook(self, uid, metadata, content)
         else:
           raise RemarkableDocumentError("Unknown file type '{fileType}'".format(content))
       else:
         raise RemarkableDocumentError("Unknown file type '{type}'".format(metadata))
-    trash = TrashBin()
+    trash = TrashBin(self)
     for k, prop in index.items():
       try:
         if prop.deleted or prop.parent == TRASH_ID:
