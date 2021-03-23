@@ -272,6 +272,11 @@ class DocTreeItem(QTreeWidgetItem):
         self.setText(3, "EBook")
       self.setText(1, entry.updatedOn())
       self.setText(2, "1" if entry.pinned else "")
+    elif isinstance(entry, TrashBin):
+      self.setText(0, entry.visibleName)
+      self.setIcon(0, icon['trash'])
+      self.setText(3, "Trash Bin")
+      self.setText(2, "")
     else:
       self.setText(0, entry.visibleName)
       self.setIcon(0, icon['folder'])
@@ -291,7 +296,7 @@ class DocTree(QTreeWidget):
 
   selectionCleared = pyqtSignal()
 
-  def __init__(self, index, *a, uid=None, **kw):
+  def __init__(self, index, *a, uid=None, show_trash=True, **kw):
     super(DocTree, self).__init__(*a, **kw)
     self.setMinimumWidth(400)
     self.setIconSize(QSize(24,24))
@@ -330,6 +335,12 @@ class DocTree(QTreeWidget):
       for d in f.folders:
         d = index.get(d)
         c = nodes[d.uid] = DocTreeItem(d, p)
+    if show_trash:
+      d = index.trash
+      p = nodes[d.uid] = DocTreeItem(d, self)
+      for i in index.trash.files:
+        d = index.get(i)
+        nodes[d.uid] = DocTreeItem(d, p)
 
     self.sortItems(0, Qt.AscendingOrder)
     self.resizeColumnToContents(2)
