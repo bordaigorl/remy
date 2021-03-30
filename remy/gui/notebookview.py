@@ -300,13 +300,14 @@ class NotebookViewer(QGraphicsView):
     if pageNum is None:
       pageNum = self._page
     page = self.document.getPage(pageNum)
-    c = QApplication.instance().config
     try:
-      r = mathpix(page, c['mathpix']['app_id'], c['mathpix']['app_key'], simplify)
+      c = QApplication.instance().config.get('mathpix')
+      r = mathpix(page, c['app_id'], c['app_key'], simplify)
       txt = QPlainTextEdit(r["text"])
       txt.setParent(self, Qt.Window)
       txt.show()
-    except:
+    except Exception as e:
+      log.error("Mathpix: %s", e)
       QMessageBox.critical(self, "Error",
         "Please check you properly configured your mathpix API keys "
         "in the configuration file.\n\n"

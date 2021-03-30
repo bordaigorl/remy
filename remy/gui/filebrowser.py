@@ -4,7 +4,7 @@ from PyQt5.QtGui import *
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 
-from remy.remarkable.metadata import *
+from remy.gui.qmetadata import *
 from remy.gui.pagerender import ThumbnailWorker
 import remy.gui.resources
 from remy.gui.notebookview import *
@@ -14,6 +14,7 @@ log = logging.getLogger('remy')
 
 from remy.gui.export import webUIExport, exportDocument
 
+from pathlib import Path
 
 class DropBox(QLabel):
 
@@ -151,8 +152,11 @@ class InfoPanel(QWidget):
     tf.setPointSize(30)
     title.setFont(tf)
     details = self.details = QFormLayout()
-    layout.addWidget(icon)
-    layout.addWidget(title)
+    layout.addWidget(icon, alignment=Qt.AlignHCenter)
+    # layout.addWidget(title, alignment=Qt.AlignHCenter)
+    titlebox = QHBoxLayout() # this is just to disable title shrinking when wrapping text
+    titlebox.addWidget(title)
+    layout.addLayout(titlebox)
     layout.addLayout(details)
     if self.readOnly:
       self.drop = None
@@ -168,6 +172,8 @@ class InfoPanel(QWidget):
     title.setTextInteractionFlags(Qt.TextSelectableByMouse)
     title.setWordWrap(True)
     title.setText("Click on item to see metadata")
+    # title.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Minimum)
+    # title.setMaximumWidth(self.window().width() * .4)
     self.setLayout(layout)
 
 
@@ -253,7 +259,12 @@ class InfoPanel(QWidget):
 
 InfoPanel.thumbs = {}
 
-class PinnedDelegate(QStyledItemDelegate):
+class NoEditDelegate(QStyledItemDelegate):
+
+  def createEditor(self, parent, option, index):
+    return None
+
+class PinnedDelegate(NoEditDelegate):
 
   def __init__(self, *a, **kw):
     super().__init__(*a, **kw)
@@ -270,12 +281,125 @@ class PinnedDelegate(QStyledItemDelegate):
     return QSize(16,24)
 
 
+DOCTYPE = {
+  PDF: 'pdf',
+  FOLDER: 'folder',
+  EPUB: 'epub'
+}
+
+
 class DocTreeItem(QTreeWidgetItem):
-  def __init__(self, entry, *a, **kw):
-    super().__init__(*a, **kw)
+
+  class UploadingItem(QWidget):
+
+    def __init__(self, title, cancel=False, parent=None, tree=None):
+      QWidget.__init__(self, parent=parent)
+      layout = QHBoxLayout(self)
+      layout.setContentsMargins(5, 5, 0, 0)
+      # layout.addStrut(24)
+      self.label = QLabel(title)
+      self.progress = QProgressBar()
+      self.progress.setRange(0, 0)
+      # self.progress.setValue(3)
+      layout.addWidget(self.label)
+      layout.addWidget(self.progress)
+      if cancel:
+        self.cancelBtn = QPushButton("Cancel")
+        if tree:
+          self.cancelBtn.setMinimumWidth(tree.columnWidth(3))
+        layout.addWidget(self.cancelBtn)
+
+  class ErrorItem(QWidget):
+
+    def __init__(self, title, msg, parent=None, tree=None):
+      QWidget.__init__(self, parent=parent)
+      layout = QHBoxLayout(self)
+      layout.setContentsMargins(5, 5, 0, 0)
+      # layout.addStrut(24)
+      self.label = QLabel(title)
+      msg = msg.strip()
+      self.msg = msg
+      if len(msg) > 30:
+        msg = msg[:30] + '…  <a href="#">More info</a>'
+      self.message = QLabel('<font color="Red">%s</font>' % msg)
+      self.message.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+      self.message.linkActivated.connect(self.showMsg)
+      bla = QLabel("Bla")
+      layout.addWidget(self.label)
+      layout.addSpacing(10)
+      layout.addWidget(self.message,2)
+      self.dismissBtn = QPushButton("Dismiss")
+      if tree:
+        self.dismissBtn.setMinimumWidth(tree.columnWidth(3))
+      layout.addWidget(self.dismissBtn)
+
+    @pyqtSlot(str)
+    def showMsg(self, href):
+      QMessageBox.critical(self.window(), "Error", "Something went wrong:\n\n" + self.msg)
+
+
+  def __init__(self, entry=None, parent=None, **kw):
+    super().__init__(parent)
+    if entry is None:
+      self.uploading(**kw)
+    else:
+      self.setEntry(entry)
+
+  def uploading(self, uid=None, etype=None, metadata=None, path=None, cancel=False):
+    self._entry = None
+    self.setFirstColumnSpanned(True)
+    title = metadata.get('visibleName', path.stem)
+    doctype = DOCTYPE.get(etype)
+    self.uploadingWidget = self.UploadingItem(title, cancel, tree=self.treeWidget())
+    if self.treeWidget():
+      self.treeWidget().setItemWidget(self, 0, self.uploadingWidget)
+    if doctype is not None:
+      self.setIcon(0, self.treeWidget()._icon[doctype])
+    self._sortdata = doctype[0].upper() + title
+
+  @property
+  def cancelled(self):
+    if isinstance(self.uploadingWidget, self.UploadingItem):
+      return self.uploadingWidget.cancelBtn.clicked
+    return None
+
+  @property
+  def dismissed(self):
+    if isinstance(self.uploadingWidget, self.ErrorItem):
+      return self.uploadingWidget.dismissBtn.clicked
+    return None
+
+  def setProgress(self, x, tot):
+    if self.uploadingWidget:
+      self.uploadingWidget.progress.setMaximum(tot)
+      self.uploadingWidget.progress.setValue(x)
+
+  def failure(self, uid=None, etype=None, metadata=None, path=None, exception=None):
+    self._entry = None
+    self.setFirstColumnSpanned(True)
+    title = metadata.get('visibleName', path.stem if path else 'Unnamed')
+    doctype = DOCTYPE.get(etype)
+    self.uploadingWidget = self.ErrorItem(title, str(exception), tree=self.treeWidget())
+    # self.uploadingWidget.dismissBtn.clicked.connect()
+    if self.treeWidget():
+      self.treeWidget().setItemWidget(self, 0, self.uploadingWidget)
+    if doctype is not None:
+      self.setIcon(0, self.treeWidget()._icon[doctype])
+    self._sortdata = doctype[0].upper() + title
+
+
+  def setEntry(self, entry):
+    if self.treeWidget():
+      self.treeWidget().removeItemWidget(self, 0)
+    self.uploadingWidget = None
+    self.setFirstColumnSpanned(False)
     self._entry = entry
     icon = self.treeWidget()._icon
+    flags = Qt.ItemIsEnabled | Qt.ItemIsSelectable
     if isinstance(entry, Document):
+      flags |= Qt.ItemNeverHasChildren | Qt.ItemIsDragEnabled
+      if not entry.index.isReadOnly() and not entry.isDeleted():
+        flags |= Qt.ItemIsEditable
       self.setText(0, entry.visibleName)
       if isinstance(entry, Notebook):
         self.setIcon(0, icon['notebook'])
@@ -289,24 +413,33 @@ class DocTreeItem(QTreeWidgetItem):
       self.setText(1, entry.updatedOn())
       self.setText(2, "1" if entry.pinned else "")
     elif isinstance(entry, TrashBin):
+      flags |= Qt.ItemIsDropEnabled
       self.setText(0, entry.visibleName)
       self.setIcon(0, icon['trash'])
       self.setText(3, "Trash Bin")
       self.setText(2, "")
     else:
+      flags |= Qt.ItemIsDropEnabled | Qt.ItemIsDragEnabled
+      if not entry.index.isReadOnly() and not entry.isDeleted():
+        flags |= Qt.ItemIsEditable
       self.setText(0, entry.visibleName)
       self.setIcon(0, icon['folder'])
       self.setText(3, "Folder")
       self.setText(2, "1" if entry.pinned else "")
-
+    self.setFlags(flags)
+    self._sortdata = self.text(3)[0] + self.text(0)
 
   def entry(self):
     return self._entry
 
   def __lt__(self, other):
     if self.treeWidget().sortColumn() == 0:
-      return (self.text(3)[0] + self.text(0)) < (other.text(3)[0] + other.text(0))
+      try:
+        return self._sortdata < other._sortdata
+      except Exception:
+        pass
     return QTreeWidgetItem.__lt__(self, other)
+
 
 class DocTree(QTreeWidget):
 
@@ -318,17 +451,29 @@ class DocTree(QTreeWidget):
     self.setIconSize(QSize(24,24))
     # self.setColumnCount(4)
     self.setHeaderLabels(["Name", "Updated", "", "Type"])
-    self.setUniformRowHeights(True)
+    self.setUniformRowHeights(False)
     self.header().setStretchLastSection(False)
     self.header().setSectionResizeMode(0, QHeaderView.Stretch)
     self.setSortingEnabled(True)
-    self.setItemDelegateForColumn(2, PinnedDelegate())
-    # self.setDragEnabled(not index.isReadOnly())
-    # self.setAcceptDrops(True)
-    # self.setDragDropMode(self.DropOnly)
-    # self.setDropIndicatorShown(True)
+    self._noeditDelegate = NoEditDelegate()
+    self.setItemDelegateForColumn(1, self._noeditDelegate)
+    self.setItemDelegateForColumn(3, self._noeditDelegate)
+    self._pinnedDelegate = PinnedDelegate()
+    self.setItemDelegateForColumn(2, self._pinnedDelegate)
 
-    index.listen(self.indexUpdated)
+    self.setEditTriggers(self.SelectedClicked | self.EditKeyPressed)
+    self.setSelectionMode(self.ExtendedSelection)
+    self.setDragDropMode(self.InternalMove)
+    self.setDragEnabled(not index.isReadOnly())
+
+    index.signals.newEntryPrepare.connect(self.newEntryPrepare)
+    index.signals.newEntryProgress.connect(self.newEntryProgress)
+    index.signals.newEntryComplete.connect(self.newEntryComplete)
+    index.signals.newEntryError.connect(self.newEntryError)
+    index.signals.updateEntryPrepare.connect(self.updateEntryPrepare)
+    index.signals.updateEntryComplete.connect(self.updateEntryComplete)
+    index.signals.updateEntryError.connect(self.updateEntryError)
+    self.index = index
 
     self._icon = {
       "trash": QIcon(QPixmap(":assets/24/trash.svg")),
@@ -371,8 +516,10 @@ class DocTree(QTreeWidget):
     cur = self.currentItem()
     if cur is None:
       return self._rootEntry
-    else:
+    elif isinstance(cur,DocTreeItem):
       return cur.entry()
+    else:
+      return None
 
   def mouseReleaseEvent(self, event):
     i = self.indexAt(event.pos())
@@ -389,21 +536,74 @@ class DocTree(QTreeWidget):
     self.setCurrentItem(item)
     self.contextMenu.emit(item, event)
 
-  def indexUpdated(self, success, action, entries, index, extra):
-    if success:
-      if action == index.ADD:
-        for uid in entries:
-          # we only handle direct descendants of items, more todo
-          d = index.get(uid)
-          p = self._nodes[d.parent]
-          self._nodes[uid] = DocTreeItem(d, p)
-      elif action == index.DEL:
-        pass
-      elif action == index.UPD:
-        pass
-    else:
-      log.error(str(extra['reason']))
-      QMessageBox.critical(self, "Error", "Something went wrong:\n\n" % e)
+  _pending_item = {}
+
+  @pyqtSlot(str, int, dict, Path)
+  def newEntryPrepare(self, uid, etype, meta, path):
+    op = NewEntryWorker.getWorkerFor(uid)
+    item = self.itemOf(meta.get('parent', ROOT_ID))
+    i = DocTreeItem(uid=uid, etype=etype, metadata=meta, path=path, cancel=op is not None, parent=item)
+    self._pending_item[uid] = i
+    if op and i.cancelled:
+      i.cancelled.connect(op.cancel)
+    self.setSortingEnabled(True)
+    self.scrollToItem(i)
+
+
+  @pyqtSlot(str, int, int)
+  def newEntryProgress(self, uid, done, tot):
+    self._pending_item[uid].setProgress(done, tot)
+
+  @pyqtSlot(str, int, dict, Path)
+  def newEntryComplete(self, uid, etype, meta, path):
+    self._nodes[uid] = i = self._pending_item[uid]
+    del self._pending_item[uid]
+    i.setEntry(self.index.get(uid))
+
+  @pyqtSlot(str, int, dict, Path, Exception)
+  def newEntryError(self, uid, etype, meta, path, exception):
+    log.debug('New entry error: %s', exception)
+    # TODO: if exception is NewEntryCancelled then remove,
+    #       otherwise, show an error message in the item widget
+    i = self._pending_item.get(uid)
+    if i:
+      i.failure(uid, etype, meta, path, exception)
+      def rem():
+        if i.parent():
+          i.parent().removeChild(i)
+        else:
+          self.invisibleRootItem().removeChild(i)
+        del self._pending_item[uid]
+      i.dismissed.connect(rem)
+
+
+  @pyqtSlot(str, int, dict)
+  def updateEntryPrepare(self, uid, etype, new_meta):
+    pass
+
+  @pyqtSlot(str, int, dict)
+  def updateEntryComplete(self, uid, etype, new_meta):
+    pass
+
+  @pyqtSlot(str, int, dict, Exception)
+  def updateEntryError(self, uid, etype, new_meta, exception):
+    pass
+
+  # def indexUpdated(self, success, action, entries, index, extra):
+  #   if success:
+  #     if action == index.ADD:
+  #       for uid in entries:
+  #         # we only handle direct descendants of items, more todo
+  #         d = index.get(uid)
+  #         p = self._nodes[d.parent]
+  #         self._nodes[uid] = DocTreeItem(d, p)
+  #     elif action == index.DEL:
+  #       pass
+  #     elif action == index.UPD:
+  #       pass
+  #   else:
+  #     log.error(str(extra['reason']))
+  #     QMessageBox.critical(self, "Error", "Something went wrong:\n\n" % e)
 
 
 
@@ -466,6 +666,10 @@ class FileBrowser(QMainWindow):
     # self.deleteAction.setShortcut(QKeySequence.Delete)
     # self.deleteAction.triggered.connect(self.deleteEntry)
     #
+    self.testAction = QAction('Test', self.tree)
+    self.testAction.triggered.connect(self.test)
+    self.folderMenu.addAction(self.testAction)
+    #
     self.importAction = QAction('&Import...', self.tree)
     self.importAction.setShortcut("Ctrl+I")
     self.importAction.triggered.connect(self.importIntoCurrentEntry)
@@ -488,12 +692,8 @@ class FileBrowser(QMainWindow):
     e = self.index.get(p)
     for pdf in files:
       log.info("Uploading %s to %s", pdf, e.visibleName if e else "root")
-      uid = self.index.newPDFDoc(pdf, metadata={'parent': p}, content=cont)
-      log.info("Saved %s as %s", pdf, uid)
-    i = self.tree.itemOf(uid)
-    self.tree.scrollToItem(i)
-    self.tree.setCurrentItem(i) #, 0, QItemSelectionModel.ClearAndSelect)
-    # self.info.setEntry(uid)
+      op = UploadWorker(self.index, pdf=pdf, metadata={'parent': p}, content=cont)
+      QThreadPool.globalInstance().start(op)
 
   # @pyqtSlot()
   # def selClear(self):
@@ -503,36 +703,44 @@ class FileBrowser(QMainWindow):
   @pyqtSlot(QTreeWidgetItem,QTreeWidgetItem)
   def entrySelected(self, cur, prev):
     entry = self.tree.currentEntry()
-    self.info.setEntry(entry)
-
+    if entry:
+      self.info.setEntry(entry)
 
   @pyqtSlot(QTreeWidgetItem,QContextMenuEvent)
   def contextMenu(self, item, event):
     entry = self.tree.currentEntry()
-    if isinstance(entry, Folder):
-      if not isinstance(entry, TrashBin):
-        self.folderMenu.popup(self.tree.mapToGlobal(event.pos()))
-    else:
-      self.documentMenu.popup(self.tree.mapToGlobal(event.pos()))
+    if entry:
+      if isinstance(entry, Folder):
+        if not isinstance(entry, TrashBin):
+          self.folderMenu.popup(self.tree.mapToGlobal(event.pos()))
+      else:
+        self.documentMenu.popup(self.tree.mapToGlobal(event.pos()))
+
+  @pyqtSlot()
+  def test(self):
+    item = self.tree.currentItem() or self.tree.invisibleRootItem()
+    p = self.tree.currentEntry()
+    op = TestWorker(self.index, metadata={'parent': p.uid, 'visibleName': "Test Note"})
+    QThreadPool.globalInstance().start(op)
 
 
   @pyqtSlot()
   def openCurrentEntry(self):
     item = self.tree.currentItem()
-    if item:
-      self.openEntry(item, 0)
+    self.openEntry(item, 0)
 
   @pyqtSlot(QTreeWidgetItem,int)
   def openEntry(self, item, col=0):
-    uid = item.entry().uid
-    index = self.index
-    if not index.isOfType(uid, FOLDER):
-      if uid not in self.viewers:
-        self.viewers[uid] = NotebookViewer(index.get(uid))
-      win = self.viewers[uid]
-      win.show()
-      win.raise_()
-      win.activateWindow()
+    if item and item.entry():
+      uid = item.entry().uid
+      index = self.index
+      if not index.isOfType(uid, FOLDER):
+        if uid not in self.viewers:
+          self.viewers[uid] = NotebookViewer(index.get(uid))
+        win = self.viewers[uid]
+        win.show()
+        win.raise_()
+        win.activateWindow()
 
   @pyqtSlot()
   def exportCurrentEntry(self):
@@ -547,3 +755,61 @@ class FileBrowser(QMainWindow):
       filenames, ok = QFileDialog.getOpenFileNames(self, "Select files to import")
       if ok and filenames:
         self._import(entry.uid, [], filenames)
+
+
+
+class NewEntryCancelled(Exception):
+  pass
+
+class NewEntryWorker(QRunnable):
+
+  def __init__(self, index, **args):
+    QRunnable.__init__(self)
+    self.index   = index
+    self.uid     = index.reserveUid()
+    NewEntryWorker._pending[self.uid] = self
+    self._args   = args
+    self._cancel = False
+
+  # @pyqtSlot(bool) # compatibility with clicked of button
+  def cancel(self, *a):
+    self._cancel = True
+
+  def _progress(self, *a):
+    if self._cancel:
+      log.debug("Cancel of new entry upload requested")
+      raise NewEntryCancelled("Cancelled!")
+
+  def run(self):
+    try:
+      self.do()
+    except Exception as e:
+      import traceback
+      traceback.print_exc()
+    finally:
+      del NewEntryWorker._pending[self.uid]
+
+  @classmethod
+  def getWorkerFor(cls, uid, default=None):
+    return cls._pending.get(uid, default)
+
+NewEntryWorker._pending = {}
+
+class UploadWorker(NewEntryWorker):
+
+  def do(self):
+    self.index.newPDFDoc(uid=self.uid, progress=self._progress, **self._args)
+
+class NewFolderWorker(NewEntryWorker):
+
+  def do(self):
+    self.index.newFolder(uid=self.uid, progress=self._progress, **self._args)
+
+
+class TestWorker(NewEntryWorker):
+
+  def do(self):
+    log.debug("Starting fake upload")
+    self.index.test('Test.pdf', uid=self.uid, progress=self._progress, **self._args)
+    log.debug("Stopping fake upload")
+

@@ -9,7 +9,7 @@ from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 
 from remy.remarkable.config import *
-from remy.remarkable.metadata import *
+from remy.gui.qmetadata import *
 from remy.remarkable.filesource import (
   LocalFileSource,
   LiveFileSourceSSH,
@@ -66,12 +66,14 @@ class RemyApp(QApplication):
           sys.exit(2)
       config.selectSource(source)
 
-
-    self.aboutToQuit.connect(self.joinWorkers)
+    self.aboutToQuit.connect(self.cleanup)
 
   @pyqtSlot()
-  def joinWorkers(self):
+  def cleanup(self):
     QThreadPool.globalInstance().waitForDone()
+    self.fsource.cleanup()
+    self.fsource.close()
+
 
   def sourceSelectionBox(self):
     sources = self.config.get('sources')
@@ -206,6 +208,7 @@ class RemyApp(QApplication):
     self._init = None
     self.initDialog = None
     self.tree = FileBrowser(index)
+    self.fsource = index.fsource # for cleanup
     self.setQuitOnLastWindowClosed(True)
     log.info("Initialised, launching browser")
 
@@ -331,7 +334,7 @@ class RemyInitWorker(QRunnable):
       self._progress(0,0,"Fetching metadata")
       fsource.prefetchMetadata(progress=self._progress)
       self._progress(0,0,"Building index")
-      index = RemarkableIndex(fsource, progress=self._progress)
+      index = QRemarkableIndex(fsource, progress=self._progress)
       self._progress(4,4,"Done")
       log.info('LOAD TIME: %f', time.perf_counter() - T0)
       self.signals.success.emit(index)

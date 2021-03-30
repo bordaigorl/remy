@@ -7,25 +7,10 @@ from stat import S_ISREG, S_ISDIR
 import subprocess
 from shutil import which
 
-from threading import Lock
+from threading import RLock
 
 import logging
 log = logging.getLogger('remy')
-
-
-class Progress():
-
-  def started(self, total):
-    pass
-
-  def aborted(self, reason):
-    pass
-
-  def progress(self, step, total):
-    pass
-
-  def finished(self):
-    pass
 
 
 
@@ -83,12 +68,12 @@ class FileSource():
   def close(self):
     return
 
-  def __del__(self):
-    try:
-      self.cleanup()
-      self.close()
-    except Exception as e:
-      log.error(e)
+  # def __del__(self):
+  #   try:
+  #     self.cleanup()
+  #     self.close()
+  #   except Exception as e:
+  #     log.error(e)
 
   def listItems(self):
     raise NotImplementedError
@@ -223,7 +208,7 @@ class LiveFileSourceSSH(FileSource):
 
     self.sftp = ssh.open_sftp()
     self.scp = self.sftp
-    self.sftp_lock = Lock()
+    self.sftp.lock = RLock()
     # self.scp = SCPClient(ssh.get_transport())
 
     self.templates = {}
@@ -256,7 +241,10 @@ class LiveFileSourceSSH(FileSource):
     return S_ISREG(p.st_mode) != 0
 
   def _isdir(self, p):
-    p = self.sftp.stat(p)
+    try:
+      p = self.sftp.stat(p)
+    except:
+      return False
     return S_ISDIR(p.st_mode) != 0
 
   def _local(self, *paths, branch=DOCSDIR):
@@ -279,7 +267,7 @@ class LiveFileSourceSSH(FileSource):
       remp = self._remote(*filename)
       if filename[-1].endswith('pdf'):
         log.info('RETR %s %s',cachep,remp)
-      with self.sftp_lock:
+      with self.sftp.lock:
         self.scp.get(remp, cachep)
     return cachep
 
@@ -289,7 +277,7 @@ class LiveFileSourceSSH(FileSource):
       cachep = self._local(filename, branch=TEMPLDIR)
       if force or not path.isfile(cachep):
         remp = self._remote(filename, branch=TEMPLDIR)
-      with self.sftp_lock:
+      with self.sftp.lock:
           self.scp.get(remp, cachep)
       return cachep
     except Exception:
@@ -305,7 +293,7 @@ class LiveFileSourceSSH(FileSource):
     #       self.scp.get(self._remote(uid + '.pagedata'), self._local())
 
   def prefetchDocument(self, uid, progress=None, force=False):
-    with self.sftp_lock:
+    with self.sftp.lock:
       # self.scp.get(self._remote(uid), self._local(uid), recursive=True)
       if self._isfile(self._remote(uid + '.pdf')):
         self.scp.get(self._remote(uid + '.pdf'), self._local(uid))
@@ -321,12 +309,13 @@ class LiveFileSourceSSH(FileSource):
     shutil.rmtree(self.cache_dir, ignore_errors=True)
     if self._dirty:
       _,out,_ = self.ssh.exec_command("/bin/systemctl restart xochitl")
-      out.channel.recv_exit_status()
+      if out.channel.recv_exit_status() == 0:
+        self._dirty = False
 
   def listItems(self):
     if self._allUids is None:
       self._allUids = []
-      with self.sftp_lock:
+      with self.sftp.lock:
         for entry in self.sftp.listdir(self._remote()):
           name = path.splitext(entry)
           if name[1] == ".metadata":
@@ -337,7 +326,7 @@ class LiveFileSourceSSH(FileSource):
     folder = self._remote(uid)
     ext = '.' + ext
     try:
-      with self.sftp_lock:
+      with self.sftp.lock:
         for entry in self.sftp.listdir(folder):
           name = path.splitext(entry)
           if name[1] == ext:
@@ -346,15 +335,15 @@ class LiveFileSourceSSH(FileSource):
       return
 
   def upload(self, local, *remote, progress=None, overwrite=False):
-    with self.sftp_lock:
+    with self.sftp.lock:
       if overwrite or not self._isfile(self._remote(*remote)):
-        self.sftp.put(local, self._remote(*remote))
+        self.sftp.put(local, self._remote(*remote), callback=progress)
         self._dirty = True
         return True
     return False
 
   def store(self, content, *remote, progress=None, overwrite=False):
-    with self.sftp_lock:
+    with self.sftp.lock:
       if overwrite or not self._isfile(self._remote(*remote)):
         with self.sftp.open(self._remote(*remote), 'w') as f:
           if type(content) is str:
@@ -365,9 +354,22 @@ class LiveFileSourceSSH(FileSource):
         return True
     return False
 
+  def remove(self, *remote, progress=None):
+    p = self._remote(*remote)
+    if self._isfile(p):
+      self.sftp.remove(p)
+      return True
+    return False
+
+  def removeDir(self, *remote, progress=None):
+    p = self._remote(*remote)
+    if self._isdir(p):
+      self.sftp.rmdir(p)
+
+
   def makeDir(self, *remote):
     try:
-      with self.sftp_lock:
+      with self.sftp.lock:
         self.sftp.mkdir(self._remote(*remote))
       self._dirty = True
       return True
@@ -510,8 +512,10 @@ class LiveFileSourceRsync(LiveFileSourceSSH):
           self._updated[entry.path] = True
 
   def cleanup(self):
+    log.debug("CLEANUP: %s", self._dirty)
     if self._dirty:
       _,out,_ = self.ssh.exec_command("/bin/systemctl restart xochitl")
-      out.channel.recv_exit_status()
+      if out.channel.recv_exit_status() == 0:
+        self._dirty = False
 
 

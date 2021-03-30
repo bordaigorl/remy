@@ -1,14 +1,18 @@
 #!/usr/bin/env python3
-import sys
-import os
 import json
 from itertools import *
 from collections import namedtuple
 import arrow
 import uuid
 
+from os import stat
+from pathlib import Path
+
 from remy.remarkable.lines import *
 from remy.remarkable.constants import *
+
+import logging
+log = logging.getLogger('remy')
 
 # DocIndex = namedtuple('DocIndex', 'metadata tree trash')
 FolderNode = namedtuple('FolderNode', 'folders files')
@@ -44,6 +48,9 @@ class RemarkableDocumentError(RemarkableError):
   pass
 
 class RemarkableSourceError(RemarkableError):
+  pass
+
+class RemarkableUidCollision(RemarkableError):
   pass
 
 METADATA = 1
@@ -109,7 +116,7 @@ class Entry:
 
   def __dir__(self):
     return (
-      ["name", "updatedOn", "get"]
+      ["name", "updatedOn", "isDeleted", "get", "fsource"]
       + list(self._metadata.keys())
       + list(self._content.keys())
     )
@@ -353,12 +360,21 @@ PDF_BASE_CONTENT  = {
 }
 
 
-
+FOLDER_METADATA = {
+    "deleted": False,
+    "metadatamodified": True,
+    "modified": True,
+    "parent": "",
+    "pinned": False,
+    "synced": False,
+    "type": "CollectionType",
+    "version": 0,
+    # "lastModified": "timestamp",
+    # "visibleName": "..."
+}
 
 
 class RemarkableIndex:
-
-  _listeners = {}
 
   def __init__(self, fsource, progress=(lambda x,tot: None)):
     self.fsource = fsource
@@ -409,24 +425,26 @@ class RemarkableIndex:
     with open(fname) as f:
       return json.load(f)
 
-  NOP = 0 # for acks
-  ADD = 1 # adding an item (listener should consider updating parent)
-  DEL = 2 # removing item (listener should consider updating parent)
-  UPD = 3 # updating metadata of item
+  def _new_entry_prepare(self, uid, etype, meta, path=None):
+    pass # for subclasses to specialise
 
-  def listen(self, f):
-    if not callable(f):
-      raise Exception("Listen called on a non-callable argument")
-    self._listeners[id(f)] = f
-    return id(f)
+  def _new_entry_progress(self, uid, done, tot):
+    pass # for subclasses to specialise
 
-  def unlisten(self, f):
-    return self._listeners.pop(id(f), None) is not None
+  def _new_entry_error(self, uid, etype, meta, path=None, exception=None):
+    pass # for subclasses to specialise
 
-  def _broadcast(self, success=True, action=NOP, entries=[], **kw):
-    for f in self._listeners.values():
-      f(success, action, entries, self, kw)
+  def _new_entry_complete(self, uid, etype, meta, path=None):
+    pass # for subclasses to specialise
 
+  def _update_entry_prepare(self, uid, etype, new_meta):
+    pass # for subclasses to specialise
+
+  def _update_entry_complete(self, uid, etype, new_meta):
+    pass # for subclasses to specialise
+
+  def _update_entry_error(self, uid, etype, new_meta, exception=None):
+    pass # for subclasses to specialise
 
 
   def isReadOnly(self):
@@ -475,20 +493,17 @@ class RemarkableIndex:
     return p
 
 
-  def uidFromPath(self, path, start=None, delim=None):
+  def uidFromPath(self, path, start=ROOT_ID, delim=None):
     p = path
     if delim is not None:
       p = path.rstrip(delim).split(delim)
     if not p:
-      return ''
-    if start:
-      node = self.index[start]
-    else:
-      node = self.root()
-    if p[0] == '':
+      return ROOT_ID
+    node = self.index[start]
+    if p[0] == '' or p[0] == '/':
       node = self.root()
     for name in p[0:-1]:
-      if name == '.' or name == '':
+      if name == '.' or name == '' or name == '/':
         continue
       if name == '..':
         node = self.index[node.parent]
@@ -502,7 +517,7 @@ class RemarkableIndex:
       if not newfound:
         return None
     last = p[-1]
-    if last == '.' or last == '':
+    if last == '.' or last == '' or last == '/':
       return node.uid
     if last == '..':
       return node.parent
@@ -646,43 +661,133 @@ class RemarkableIndex:
       else:
         yield n
 
+  ### Concurrency assumption:
+  ### a client of RemarkableIndex has to ensure that there are
+  ### max 1 writer (readers are unlimited)
 
-  def _newUid(self):
+  _reservedUids = set()
+
+  def reserveUid(self):
+    # collisions are highly unlikely, but good to check
     uid = str(uuid.uuid4())
-    while uid in self.index:
+    while uid in self.index or uid in self._reservedUids:
       uid = str(uuid.uuid4())
+    self._reservedUids.add(uid)
     return uid
 
-  def newPDFDoc(self, pdf, metadata={}, content={}):
-    if self.isReadOnly():
-      raise RemarkableSourceError("The file source '%s' is read-only" % self.fsource.name)
-    uid = self._newUid()
-    print(uid)
-    meta = PDF_BASE_METADATA.copy()
-    meta.setdefault('visibleName', os.path.splitext(os.path.basename(pdf))[0])
-    meta.setdefault('lastModified', str(arrow.utcnow().int_timestamp * 1000))
-    meta.update(metadata)
+  def newFolder(self, uid=None, metadata={}, progress=None):
+    try:
+      if self.isReadOnly():
+        raise RemarkableSourceError("The file source '%s' is read-only" % self.fsource.name)
 
-    cont = PDF_BASE_CONTENT.copy()
-    cont.update(content)
+      if not uid:
+        uid = self.reserveUid()
+      self._new_entry_prepare(uid, FOLDER, metadata)
 
+      def p(x):
+        if callable(progress):
+          progress(x, 2)
+        self._new_entry_progress(uid, x, 2)
+
+      if self.fsource.exists(uid, ext="metadata"):
+        raise RemarkableUidCollision("Attempting to create new document but chosen uuid is in use")
+
+      p(0, 2)
+
+      meta = FOLDER_METADATA.copy()
+      meta.setdefault('visibleName', 'New Folder')
+      meta.setdefault('lastModified', str(arrow.utcnow().int_timestamp * 1000))
+      meta.update(metadata)
+      if not self.isFolder(meta["parent"]):
+        raise RemarkableError("Cannot find parent %s" % meta["parent"])
+
+      self.fsource.store(meta, uid + '.metadata')
+      p(1, 2)
+      self.fsource.store({}, uid + '.content')
+      p(2, 2)
+      self._new_entry_complete(uid, FOLDER, metadata)
+      return uid
+    except Exception as e:
+      # cleanup if partial upload
+      self.fsource.remove(uid + '.metadata')
+      self.fsource.remove(uid + '.content')
+      self._new_entry_error(uid, FOLDER, metadata, e)
+      raise e
+
+
+  def newPDFDoc(self, pdf=None, uid=None, metadata={}, content={}, progress=None):
     try:
 
-      self.fsource.upload(pdf, uid + '.pdf')
+      if self.isReadOnly():
+        raise RemarkableSourceError("The file source '%s' is read-only" % self.fsource.name)
+
+      if not uid:
+        uid = self.reserveUid()
+      pdf = Path(pdf)
+
+      log.debug("U %s %s", pdf, uid)
+
+      self._new_entry_prepare(uid, PDF, metadata, pdf)
+
+      totBytes = 0
+      if callable(progress):
+        def p(x):
+          progress(x, totBytes)
+          self._new_entry_progress(uid, x, totBytes)
+        def up(x, t):
+          p(400+x)
+      else:
+        def p(x,t=0): pass
+        up = None
+
+      if self.fsource.exists(uid, ext="metadata"):
+        raise RemarkableUidCollision("Attempting to create new document but chosen uuid is in use")
+
+      meta = PDF_BASE_METADATA.copy()
+      meta.setdefault('visibleName', pdf.stem)
+      meta.setdefault('lastModified', str(arrow.utcnow().int_timestamp * 1000))
+      meta.update(metadata)
+      if not self.isFolder(meta["parent"]):
+        raise RemarkableError("Cannot find parent %s" % meta["parent"])
+
+      cont = PDF_BASE_CONTENT.copy()
+      cont.update(content)
+
+      # imaginary 100bytes per json file
+      totBytes = 400 + stat(pdf).st_size
+
+      log.debug("U Start %s", pdf)
+
+      p(0)
       self.fsource.store(meta, uid + '.metadata')
+      log.debug("U meta %s", pdf)
+      p(200)
       self.fsource.store(cont, uid + '.content')
+      log.debug("U cont %s", pdf)
+      p(300)
       self.fsource.store('', uid + '.pagedata')
+      log.debug("U pd %s", pdf)
+      p(400)
+      self.fsource.upload(pdf, uid + '.pdf', progress=up)
+      log.debug("U upl %s", pdf)
       self.fsource.makeDir(uid)
+      log.debug("U dir %s", pdf)
 
       self.index[uid] = d = PDFDoc(self, uid, meta, cont)
       self.index[d.parent].files.append(uid)
 
-      self._broadcast(action=self.ADD, entries=[uid])
+      p(totBytes)
+      log.debug("U done %s", pdf)
+      self._new_entry_complete(uid, PDF, metadata, pdf)
 
       return uid
 
     except Exception as e:
-      print(e)
-      self._broadcast(success=False, action=self.ADD, entries=[uid], reason=e)
-      # should cleanup if partial upload
-      return None
+      # cleanup if partial upload
+      self.fsource.remove(uid + '.pdf')
+      self.fsource.remove(uid + '.metadata')
+      self.fsource.remove(uid + '.content')
+      self.fsource.remove(uid + '.pagedata')
+      self.fsource.removeDir(uid)
+      self._new_entry_error(uid, PDF, metadata, pdf, e)
+      raise e
