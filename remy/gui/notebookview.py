@@ -28,6 +28,9 @@ class NotebookViewer(QGraphicsView):
     QGraphicsView.__init__(self)
     # self.setAttribute(Qt.WA_OpaquePaintEvent, True)
 
+    self.setRenderHint(QPainter.Antialiasing)
+    self.setRenderHint(QPainter.SmoothPixmapTransform)
+
     self.document = document
     self.options = QApplication.instance().config.get('preview', {})
     # document.prefetch()
