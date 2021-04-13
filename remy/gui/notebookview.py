@@ -227,7 +227,7 @@ class NotebookViewer(QGraphicsView):
   def wheelEvent(self, event):
     if event.modifiers() == Qt.NoModifier:
       QAbstractScrollArea.wheelEvent(self, event)
-    else:
+    elif event.modifiers() != Qt.ShiftModifier:
       self._fit = False
 
       self.setTransformationAnchor(QGraphicsView.NoAnchor)

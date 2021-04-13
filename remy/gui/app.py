@@ -109,7 +109,7 @@ def main():
   #   f.setBold(True)
   #   sit.setFont(0, f)
 
-  tree =  FileBrowser(index)
+  tree = FileBrowser(index)
 
   @pyqtSlot()
   def cleanup():
