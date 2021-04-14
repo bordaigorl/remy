@@ -71,8 +71,24 @@ def pdfrotate(outputPath, rotate=0):
   with open(outputPath, 'wb') as out:
     writer.write(out)
 
+def _trafo(w,h,tw,th):
+  if w <= h:
+    if w <= tw:
+      ratio = max(tw / w, th / h)
+    else:
+      ratio = min(tw / w, th / h)
+    tx = 0
+    ty = th - ( h * ratio )
+    rot = 0
+  else:
+    w, h = h, w
+    ratio = min(tw / w, th / h)
+    tx = w * ratio
+    ty = th - ( h * ratio )
+    rot = 90
+  return [rot, ratio, tx, ty]
 
-def pdfmerge(basePath, outputPath, pdfRanges=None, rotate=0, progress=None):
+def pdfmerge(basePath, outputPath, pdfRanges=None, rotate=0, progress=None, transform="annot"):
   if isinstance(basePath, PdfFileReader):
     baseReader = basePath
   else:
@@ -93,29 +109,27 @@ def pdfmerge(basePath, outputPath, pdfRanges=None, rotate=0, progress=None):
     s = ap.cropBox or ap.artBox
     aw, ah = s.upperRight[0] - s.upperLeft[0], s.upperLeft[1] - s.lowerLeft[1]
     s = bp.cropBox or bp.artBox
-    w, h = s.upperRight[0] - s.upperLeft[0], s.upperLeft[1] - s.lowerLeft[1]
+    bw, bh = s.upperRight[0] - s.upperLeft[0], s.upperLeft[1] - s.lowerLeft[1]
 
-    np = PageObject.createBlankPage(writer, aw, ah)
-    if w <= h:
-      ratio = min(aw / w, ah / h)
-      tx = 0
-      ty = ah - ( h * ratio )
-      rot = 0
+    if transform=="base":
+      np = PageObject.createBlankPage(writer, aw, ah)
+      args = _trafo(bw,bh,aw,ah)
+      np.mergeRotatedScaledTranslatedPage(bp, *args)
+      np.mergePage(ap)
+      writer.removeLinks() # until we implement transformations on annotations
+    elif transform=="annot":
+      np = bp
+      args = _trafo(aw,ah,bw,bh)
+      np.mergeRotatedScaledTranslatedPage(ap, *args)
     else:
-      w, h = h, w
-      ratio = min(aw / w, ah / h)
-      tx = w * ratio
-      ty = ah - ( h * ratio )
-      rot = 90
-    np.mergeRotatedScaledTranslatedPage(bp, rot, ratio, tx, ty)
-    np.mergePage(ap)
+      log.error("Sorry, I can only transform 'base' (pdf) or 'annot'ations.")
+
     if rotate:
       np.rotateCounterClockwise(rotate)
 
     writer.addPage(np)
     _progress(progress, page, pageNum + 1)
 
-  writer.removeLinks() # until we implement transformations on annotations
   with open(outputPath, 'wb') as out:
     writer.write(out)
 
