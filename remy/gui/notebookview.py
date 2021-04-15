@@ -29,7 +29,8 @@ class NotebookViewer(QGraphicsView):
     # self.setAttribute(Qt.WA_OpaquePaintEvent, True)
 
     self.setRenderHint(QPainter.Antialiasing)
-    self.setRenderHint(QPainter.SmoothPixmapTransform)
+    # self.setRenderHint(QPainter.SmoothPixmapTransform)
+    # setting this^ per-pixmap now, so pencil textures are not smoothened
 
     self.document = document
     self.options = QApplication.instance().config.get('preview', {})
@@ -139,7 +140,7 @@ class NotebookViewer(QGraphicsView):
         return None
     return self._templates[bg.name]
 
-  def makePageScene(self, i, forViewing=True, simplify=0, smoothen=False, eraser_mode="ignore"):
+  def makePageScene(self, i, forViewing=True, simplify=0, smoothen=False, eraser_mode="ignore", pencil_resolution=.4):
     page = self.document.getPage(i)
     scene = QGraphicsScene()
     r = scene.addRect(0,0,rm.WIDTH, rm.HEIGHT)
@@ -164,7 +165,7 @@ class NotebookViewer(QGraphicsView):
       scene.baseItem = None
     # except Exception as e:
       # print("Too bad, can't open background %s" % e)
-    PageGraphicsItem(page, scene=scene, simplify=simplify, smoothen=smoothen, eraser_mode=eraser_mode, parent=r)
+    PageGraphicsItem(page, scene=scene, simplify=simplify, smoothen=smoothen, eraser_mode=eraser_mode, pencil_resolution=pencil_resolution, parent=r)
     scene.setSceneRect(r.rect())
     if forViewing:
       r=scene.addRect(0,0,rm.WIDTH, rm.HEIGHT)
@@ -174,8 +175,9 @@ class NotebookViewer(QGraphicsView):
   def loadPage(self, i):
     T0 = time.perf_counter()
     ermode = self.options.get("eraser_mode", "ignore")
+    pres = self.options.get("pencil_resolution", 0.4)
     if i not in self._page_cache:
-      self._page_cache[i] = self.makePageScene(i, eraser_mode=ermode)
+      self._page_cache[i] = self.makePageScene(i, eraser_mode=ermode, pencil_resolution=pres)
     self.setScene(self._page_cache[i])
     self._page = i
     self.refreshTitle()

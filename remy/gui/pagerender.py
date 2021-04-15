@@ -7,6 +7,8 @@ from PyQt5.QtPrintSupport import *
 
 import remy.remarkable.constants as rm
 
+from itertools import groupby
+
 import time
 import logging
 log = logging.getLogger('remy')
@@ -22,24 +24,65 @@ except Exception:
   simpl = None
 
 
-def flat_width(stroke, segment):
-  return stroke.width
+def dynamic_width(segment):
+  return (segment.width,None)
 
-def dynamic_width(stroke, segment):
-  return segment.width #+ segment.pressure
+def very_dynamic_width(segment):
+  return (round((segment.width *.7) + (segment.width * .3 * segment.pressure),2),None)
 
-def bold_dynamic_width(stroke, segment):
-  return max(segment.width * segment.pressure * .7, stroke.width * .8)
+def pencil_width(segment):
+  return (round(segment.width*.55,2),pencilBrushes().getIndex(segment.pressure))
 
-def very_dynamic_width(stroke, segment):
-  return (segment.width / 2) + (segment.width / 2 * segment.pressure)
+def mech_pencil_width(segment):
+  return (round(segment.width/1.5,2),pencilBrushes().getIndex(segment.pressure))
+
+def flat_pencil_width(segment):
+  return (round(segment.width*.55,2),round(segment.pressure, 2))
+
+def flat_mech_pencil_width(segment):
+  return (round(segment.width/1.5,2),round(segment.pressure, 2))
 
 def const_width(w):
-    return lambda stroke, segment: w
+    return lambda stroke, segment: (w,None)
 
 def _progress(p, i, t):
   if callable(p):
     p(i, t)
+
+
+class PencilBrushes():
+
+  def __init__(self, N=15, size=200):
+    from random import randint
+    self._textures = []
+    img = QImage(size, size, QImage.Format_ARGB32)
+    img.fill(Qt.transparent)
+    for i in range(N):
+      for j in range(int(size*size*(i+1)/N/2.5)):
+        img.setPixelColor(randint(0,size-1),randint(0,size-1),Qt.black)
+      self._textures.append(img.copy())
+
+  def getIndex(self, i):
+    i = int(i * (len(self._textures)-1))
+    return max(0, min(i, len(self._textures)-1))
+
+  def getTexture(self, i):
+    return self._textures[max(0,min(i, len(self._textures)-1))]
+
+  def getBrush(self, i, scale=.4):
+    b = QBrush(self.getTexture(i))
+    if scale != 1:
+      tr = QTransform()
+      tr.scale(scale,scale)
+      b.setTransform(tr)
+    return b
+
+_pencilBrushes = None
+def pencilBrushes(**kw):
+  global _pencilBrushes
+  if _pencilBrushes is None:
+    _pencilBrushes = PencilBrushes(**kw)
+  return _pencilBrushes
 
 
 DEFAULT_COLORS = [Qt.black, QColor('#bbbbbb'), Qt.white]
@@ -113,6 +156,7 @@ class PageGraphicsItem(QGraphicsRectItem):
       scene,
       colors=DEFAULT_COLORS,
       highlight=DEFAULT_HIGHLIGHT,
+      pencil_resolution=.4,
       simplify=0,
       smoothen=False,
       eraser_mode=AUTO_ERASER,
@@ -146,7 +190,6 @@ class PageGraphicsItem(QGraphicsRectItem):
     pen.setWidth(1)
     pen.setCapStyle(Qt.RoundCap)
     pen.setJoinStyle(Qt.RoundJoin)
-    pbrush = QBrush(Qt.Dense3Pattern)
 
     totalStrokes = sum(len(l.strokes) for l in page.layers)
     curStroke = 0
@@ -159,61 +202,42 @@ class PageGraphicsItem(QGraphicsRectItem):
         eraser_mode = AUTO_ERASER_IGNORE
 
       for k in l.strokes:
-        calcwidth = dynamic_width
-        if k.pen == 0 or k.pen == 12:
-          #### BRUSH             ####
+        tool = rm.TOOL_ID.get(k.pen)
+        # print(rm.TOOL_NAME.get(tool))
+
+        # COLOR
+        if tool == rm.HIGHLIGHTER_TOOL:
+          pen.setColor(highlight)
+        elif tool == rm.ERASER_TOOL:
+          pen.setColor(Qt.white)
+        else:
           pen.setColor(colors[k.color])
+
+        # WIDTH CALCULATION
+        if tool == rm.PENCIL_TOOL:
+          if pencil_resolution:
+            calcwidth = pencil_width
+          else:
+            calcwidth = flat_pencil_width
+        elif tool == rm.MECH_PENCIL_TOOL:
+          if pencil_resolution:
+            calcwidth = mech_pencil_width
+          else:
+            calcwidth = flat_mech_pencil_width
+        # elif tool == rm.BALLPOINT_TOOL:
+        #   calcwidth = very_dynamic_width
+        else:
+          calcwidth = dynamic_width
+
+        # AUTO ERASER SETTINGS
+        if tool == rm.BRUSH_TOOL or tool == rm.MARKER_TOOL:
           if eraser_mode == AUTO_ERASER:
             eraser_mode = AUTO_ERASER_ACCURATE
-        elif (k.pen == 1 or k.pen == 14):
-          #### PENCIL            ####
-          c = QColor(colors[k.color])
-          c.setAlpha(180)
-          pbrush.setColor(c)
-          pen.setBrush(pbrush)
+        elif tool == rm.PENCIL_TOOL:
           if eraser_mode == AUTO_ERASER:
             if max(s.width for s in k.segments) > 2:
               eraser_mode = AUTO_ERASER_ACCURATE
-        elif (k.pen == 2 or k.pen == 15):
-          #### BALLPOINT         ####
-          pen.setColor(colors[k.color])
-          # calcwidth = very_dynamic_width
-          # pen.setWidth(2)
-        elif (k.pen == 3 or k.pen == 16):
-          #### MARKER            ####
-          pen.setColor(colors[k.color])
-          # calcwidth = bold_dynamic_width
-          if eraser_mode == AUTO_ERASER:
-            eraser_mode = AUTO_ERASER_ACCURATE
-        elif (k.pen == 4 or k.pen == 17):
-          #### FINELINER         ####
-          pen.setColor(colors[k.color])
-          # calcwidth = flat_width
-        elif (k.pen == 9 or k.pen == 21):
-          #### CALLIGRAPHY       ####
-          pen.setColor(colors[k.color])
-          # calcwidth = dynamic_width
-        elif (k.pen == 5 or k.pen == 18):
-          #### HIGHLIGHTER       ####
-          pen.setColor(highlight)
-          # calcwidth = const_width(30)
-        elif (k.pen == 6):
-          #### ERASER            ####
-          pen.setColor(Qt.white)
-          # calcwidth = flat_width
-        elif (k.pen == 7 or k.pen == 13):
-          #### MECHANICAL PENCIL ####
-          pbrush.setColor(colors[k.color])
-          pen.setBrush(pbrush)
-          # calcwidth = flat_width
-        elif k.pen == 8:
-          #### ERASE AREA        ####
-          # pen.setColor(Qt.white)
-          # calcwidth = const_width(0)
-          pass
-        else:
-          log.warning("Unknown pen code %d" % k.pen)
-          pen.setColor(Qt.red)
+
         pen.setWidthF(0)
         path = None
 
@@ -252,7 +276,7 @@ class PageGraphicsItem(QGraphicsRectItem):
           group.setParentItem(newgroup)
           group = newgroup
         else:
-          if (simplify > 0 or smoothen) and (k.pen == 4 or k.pen == 17):
+          if (simplify > 0 or smoothen) and tool == rm.FINELINER_TOOL:
             pen.setWidthF(k.width)
             if simplify > 0:
               sk = simpl(k, simplify)
@@ -269,24 +293,34 @@ class PageGraphicsItem(QGraphicsRectItem):
             else:
               for i in range(1,len(sk)):
                 path.lineTo(sk[i][0],sk[i][1])
+            item=QGraphicsPathItem(path, group)
+            item.setPen(pen)
           else:
             # STANDARD
-            for s in k.segments:
-              w = calcwidth(k, s)
-              if w == pen.widthF() and path:
+            path = QPainterPath(QPointF(k.segments[0].x, k.segments[0].y))
+            path.setFillRule(Qt.WindingFill)
+            for (w,p), segments in groupby(k.segments[1:], calcwidth):
+              for s in segments:
                 path.lineTo(s.x,s.y)
-              else:
-                if path:
-                  path.lineTo(s.x,s.y)
-                  item=QGraphicsPathItem(path, group)
-                  item.setPen(pen)
-                path = QPainterPath(QPointF(s.x, s.y))
-                path.setFillRule(Qt.WindingFill)
-                pen.setWidthF(w)
-            # END STANDARD
 
-          item=QGraphicsPathItem(path, group)
-          item.setPen(pen)
+              if pencil_resolution and tool == rm.PENCIL_TOOL and p:
+                # draw fuzzy edges
+                item=QGraphicsPathItem(path, group)
+                pen.setBrush(pencilBrushes().getBrush(int(p*.7), scale=pencil_resolution))
+                pen.setWidthF(w*1.15)
+                item.setPen(pen)
+
+              pen.setWidthF(w)
+              if p is not None:
+                if pencil_resolution:
+                  pen.setBrush(pencilBrushes().getBrush(p, scale=pencil_resolution))
+                else:
+                  pen.setColor(QColor(int(p*255),int(p*255),int(p*255)))
+              item=QGraphicsPathItem(path, group)
+              item.setPen(pen)
+              path = QPainterPath(path.currentPosition())
+              path.setFillRule(Qt.WindingFill)
+            # END STANDARD
 
         _progress(progress,curStroke,totalStrokes); curStroke += 1
 
