@@ -80,6 +80,12 @@ class Entry:
       updated = self.lastModified or "Unknown"
     return updated
 
+  def cover(self):
+    c = self.get('coverPageNumber', -1, CONTENT)
+    if c < 0:
+      return self.get('lastOpenedPage', 0)
+    return c
+
   def get(self, field, default=None, where=BOTH):
     if field in self._metadata and where & METADATA:
       return self._metadata[field]

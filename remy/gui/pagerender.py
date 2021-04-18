@@ -342,7 +342,6 @@ def pixmapOfBackground(bg):
       return None
   return _TEMPLATE_CACHE[bg.name]
 
-
 def BarePageScene(page, parent=None, include_base_layer=True, orientation=None, **kw):
   scene = QGraphicsScene(parent=parent)
   r = scene.addRect(0,0,rm.WIDTH, rm.HEIGHT)
@@ -354,3 +353,66 @@ def BarePageScene(page, parent=None, include_base_layer=True, orientation=None, 
   PageGraphicsItem(page, scene=scene, parent=r, **kw)
   scene.setSceneRect(r.rect())
   return scene
+
+# parallelising BarePageScene requires work because Pixmaps can only be created in main thread
+# so you need to do as much as possible in the worker thread, get a signal with the pagescene
+# and a QImage of the background (maybe), then in main thread you add the PixmapItem to the scene
+
+
+class ThumbnailSignal(QObject):
+  thumbReady = pyqtSignal(str, QImage)
+
+class ThumbnailWorker(QRunnable):
+
+  def __init__(self, index, uid, height=150):
+    QRunnable.__init__(self)
+    self.uid = uid
+    self.index = index
+    self.height = height
+    self.signals = ThumbnailSignal()
+
+  def run(self):
+    try:
+      d = self.index.get(self.uid)
+      log.info("Generating thumb for %s", d.name())
+      page = d.getPage(d.cover())
+      s = BarePageScene(page,
+                        include_base_layer=False,
+                        pencil_resolution = 1,
+                        simplify=0, smoothen=False,
+                        eraser_mode=IGNORE_ERASER)
+      img = QImage(self.height * s.width() / s.height(), self.height ,QImage.Format_ARGB32)
+      img.fill(Qt.white)
+      painter = QPainter(img)
+      painter.setRenderHint(QPainter.Antialiasing)
+      painter.setRenderHint(QPainter.SmoothPixmapTransform)
+      if page.background and page.background.name != "Blank":
+        bgf = page.background.retrieve()
+        if bgf:
+          bg = QImage(bgf)
+          painter.drawImage(img.rect(), bg)
+      elif d.baseDocument():
+        pdf = d.baseDocument()
+        pdf = pdf.page(d.cover())
+        sz = pdf.pageSize()
+        w, h = sz.width(), sz.height()
+        if w <= h:
+          ratio = min(WIDTH / w, HEIGHT / h)
+        else:
+          ratio = min(HEIGHT / w, WIDTH / h)
+        xres = 5.0 * ratio
+        yres = 5.0 * ratio
+        if w <= h:
+          pdf = pdf.renderToImage(xres, yres)
+        else:
+          pdf = pdf.renderToImage(xres, yres, -1,-1,-1,-1, pdf.Rotate270)
+        painter.drawImage(img.rect(), pdf)
+      s.render(painter)
+      pen = QPen(Qt.gray)
+      pen.setWidth(2)
+      painter.setPen(pen)
+      painter.drawRect(img.rect())
+      painter.end()
+      self.signals.thumbReady.emit(self.uid, img)
+    except Exception as e:
+      log.warning("Could not create thumbnail for %s [%s]", self.uid, e)

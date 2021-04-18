@@ -5,6 +5,7 @@ from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 
 from remy.remarkable.metadata import *
+from remy.gui.pagerender import ThumbnailWorker
 import remy.gui.resources
 from remy.gui.notebookview import *
 
@@ -142,6 +143,7 @@ class InfoPanel(QWidget):
     self.index = index
     self.rootName = index.fsource.name
     self.readOnly = index.isReadOnly()
+    self.thumbs = {}
     layout = self.layout = QVBoxLayout()
     icon = self.icon = QLabel()
     title = self.title = QLabel()
@@ -185,6 +187,12 @@ class InfoPanel(QWidget):
   def _resetDetails(self):
     while self.details.rowCount() > 0:
       self.details.removeRow(0)
+
+  @pyqtSlot(str,QImage)
+  def _onThumb(self, uid, img):
+    self.thumbs[uid] = img
+    if uid == self.entry.uid:
+      self.icon.setPixmap(QPixmap.fromImage(img))
 
   def setEntry(self, entry):
     if not isinstance(entry, Entry):
@@ -237,6 +245,12 @@ class InfoPanel(QWidget):
         print(entry)
         self.title.setText("Unknown item")
 
+      if entry.uid in self.thumbs:
+        self.icon.setPixmap(QPixmap.fromImage(self.thumbs[entry.uid]))
+      else:
+        tgen = ThumbnailWorker(self.index, entry.uid)
+        tgen.signals.thumbReady.connect(self._onThumb)
+        QThreadPool.globalInstance().start(tgen)
 
 
 class PinnedDelegate(QStyledItemDelegate):
