@@ -257,13 +257,14 @@ class PinnedDelegate(QStyledItemDelegate):
 
   def __init__(self, *a, **kw):
     super().__init__(*a, **kw)
-    self._icon = QPixmap(":assets/bookmark.svg")
+    if not hasattr(PinnedDelegate, "_icon"):
+      PinnedDelegate._icon = QPixmap(":assets/bookmark.svg")
 
   def paint(self, painter, style, i):
     QStyledItemDelegate.paint(self, painter, style, QModelIndex())
     if i.data():
       p = style.rect.center()
-      painter.drawPixmap(p.x()-8,p.y()-8, self._icon)
+      painter.drawPixmap(p.x()-8,p.y()-8, PinnedDelegate._icon)
 
   def sizeHint(self, style, i):
     return QSize(16,24)
