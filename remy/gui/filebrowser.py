@@ -417,7 +417,6 @@ class FileBrowser(QMainWindow):
 
     splitter = self.splitter = QSplitter()
     splitter.setHandleWidth(0)
-    self.setCentralWidget(splitter)
 
     tree = self.tree = DocTree(index, splitter)
     info = self.info = InfoPanel(index, splitter)
@@ -447,9 +446,10 @@ class FileBrowser(QMainWindow):
     fg.moveCenter(dg.center())
     self.move(fg.topLeft())
 
-    splitter.setStretchFactor(0,2)
-    splitter.setStretchFactor(1,1)
+    splitter.setStretchFactor(0,3)
+    splitter.setStretchFactor(1,2)
 
+    self.setCentralWidget(splitter)
     # Todo: actions fields, menu per entry type (folder, pdf, nb, epub)
     self.documentMenu = QMenu(self)
     self.folderMenu = QMenu(self)
