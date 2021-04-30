@@ -33,7 +33,7 @@ class NotebookViewer(QGraphicsView):
     # setting this^ per-pixmap now, so pencil textures are not smoothened
 
     self.document = document
-    self.options = QApplication.instance().config.get('preview', {})
+    self.options = QApplication.instance().config.preview
     # document.prefetch()
     # self.uid = uid
 
@@ -52,7 +52,7 @@ class NotebookViewer(QGraphicsView):
     act.triggered.connect(lambda: self.export())
     self.menu.addAction(act)
     ###
-    if QApplication.instance().source.get('enable_webui_export'):
+    if QApplication.instance().config.get('enable_webui_export'):
       act = QAction('PDF from WebUI...', self)
       act.triggered.connect(lambda: self.webUIExport())
       self.menu.addAction(act)

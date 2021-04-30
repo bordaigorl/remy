@@ -337,13 +337,16 @@ class RemarkableIndex:
 
   _listeners = {}
 
-  def __init__(self, fsource):
+  def __init__(self, fsource, progress=(lambda x,tot: None)):
     self.fsource = fsource
     self._uids = list(fsource.listItems())
     index = {ROOT_ID: RootFolder(self)}
 
+    # progress(0, len(self._uids))
+
     for j, uid in enumerate(self._uids):
       print('%d%%' % (j * 100 // len(self._uids)), end='\r',flush=True)
+      progress(j, len(self._uids)*2)
       metadata = self._readJson(uid, ext='metadata')
       content  = self._readJson(uid, ext='content')
       if metadata["type"] == FOLDER_TYPE:
@@ -361,6 +364,7 @@ class RemarkableIndex:
         raise RemarkableDocumentError("Unknown file type '{type}'".format(metadata))
     trash = TrashBin(self)
     for k, prop in index.items():
+      progress(len(self._uids)+j, len(self._uids)*2)
       try:
         if prop.deleted or prop.parent == TRASH_ID:
           trash.append(k)

@@ -530,7 +530,7 @@ class ExportDialog(QDialog):
 
 def exportDocument(doc, parent=None):
   ok = True
-  opt = QApplication.instance().config.get("export", {})
+  opt = QApplication.instance().config.export
   filename = doc.visibleName
   if not filename.endswith(".pdf"):
     filename += ".pdf"
@@ -547,7 +547,7 @@ def exportDocument(doc, parent=None):
 
 def webUIExport(doc, filename=None, parent=None):
   ok = True
-  opt = QApplication.instance().config.get("export", {})
+  opt = QApplication.instance().config.export
   if filename is None:
     filename = doc.visibleName
     if not filename.endswith(".pdf"):
