@@ -153,7 +153,6 @@ class PageGraphicsItem(QGraphicsRectItem):
   def __init__(
       self,
       page,
-      scene,
       colors=DEFAULT_COLORS,
       highlight=DEFAULT_HIGHLIGHT,
       pencil_resolution=.4,
@@ -350,7 +349,7 @@ def BarePageScene(page, parent=None, include_base_layer=True, orientation=None, 
     img = pixmapOfBackground(page.background)
     if img:
       QGraphicsPixmapItem(img, r)
-  PageGraphicsItem(page, scene=scene, parent=r, **kw)
+  PageGraphicsItem(page, parent=r, **kw)
   scene.setSceneRect(r.rect())
   return scene
 
@@ -412,7 +411,8 @@ class ThumbnailWorker(QRunnable):
       pen.setWidth(2)
       painter.setPen(pen)
       painter.drawRect(img.rect())
-      painter.end()
       self.signals.thumbReady.emit(self.uid, img)
     except Exception as e:
       log.warning("Could not create thumbnail for %s [%s]", self.uid, e)
+    finally:
+      painter.end()

@@ -7,6 +7,8 @@ from stat import S_ISREG, S_ISDIR
 import subprocess
 from shutil import which
 
+from threading import Lock
+
 import logging
 log = logging.getLogger('remy')
 
@@ -76,7 +78,17 @@ class FileSource():
     raise NotImplementedError
 
   def cleanup(self):
-    raise NotImplementedError
+    return
+
+  def close(self):
+    return
+
+  def __del__(self):
+    try:
+      self.cleanup()
+      self.close()
+    except Exception as e:
+      log.error(e)
 
   def listItems(self):
     raise NotImplementedError
@@ -182,7 +194,7 @@ class LiveFileSourceSSH(FileSource):
 
   _dirty = False
 
-  def __init__(self, name, ssh, cache_dir=None, username=None, remote_documents=None, remote_templates=None, use_banner=False, connect=True, **kw):
+  def __init__(self, ssh, name="SSH", cache_dir=None, username=None, remote_documents=None, remote_templates=None, use_banner=False, connect=True, utils_path='$HOME', **kw):
     self.ssh = ssh
     self.name = name
 
@@ -204,13 +216,14 @@ class LiveFileSourceSSH(FileSource):
       _,out,_ = ssh.exec_command("/bin/systemctl stop xochitl")
       if out.channel.recv_exit_status() == 0:
         self._dirty = True
-        _,out,_ = ssh.exec_command("remarkable-splash '%s'" % use_banner)
+        _,out,_ = ssh.exec_command(utils_path + "/remarkable-splash '%s'" % use_banner)
         out.channel.recv_exit_status()
       else:
         log.warning("I could not stop xochitl")
 
     self.sftp = ssh.open_sftp()
     self.scp = self.sftp
+    self.sftp_lock = Lock()
     # self.scp = SCPClient(ssh.get_transport())
 
     self.templates = {}
@@ -255,7 +268,7 @@ class LiveFileSourceSSH(FileSource):
   def isReadOnly(self):
     return False
 
-  def retrieve(self, *filename, ext=None, progress=None, force=False):
+  def retrieve(self, *filename, ext=None, progress=None, force=True):
     if ext:
       filename = filename[:-1] + (filename[-1] + '.' + ext,)
     cachep = self._local(*filename)
@@ -264,7 +277,10 @@ class LiveFileSourceSSH(FileSource):
       os.makedirs(d)
     if force or not path.isfile(cachep):
       remp = self._remote(*filename)
-      self.scp.get(remp, cachep)
+      if filename[-1].endswith('pdf'):
+        log.info('RETR %s %s',cachep,remp)
+      with self.sftp_lock:
+        self.scp.get(remp, cachep)
     return cachep
 
   def retrieveTemplate(self, name, progress=None, force=False, preferVector=False):
@@ -273,7 +289,8 @@ class LiveFileSourceSSH(FileSource):
       cachep = self._local(filename, branch=TEMPLDIR)
       if force or not path.isfile(cachep):
         remp = self._remote(filename, branch=TEMPLDIR)
-        self.scp.get(remp, cachep)
+      with self.sftp_lock:
+          self.scp.get(remp, cachep)
       return cachep
     except Exception:
       log.warning("The template '%s' could not be loaded", name)
@@ -288,11 +305,12 @@ class LiveFileSourceSSH(FileSource):
     #       self.scp.get(self._remote(uid + '.pagedata'), self._local())
 
   def prefetchDocument(self, uid, progress=None, force=False):
-    # self.scp.get(self._remote(uid), self._local(uid), recursive=True)
-    if self._isfile(self._remote(uid + '.pdf')):
-      self.scp.get(self._remote(uid + '.pdf'), self._local(uid))
-    if self._isfile(self._remote(uid + '.epub')):
-      self.scp.get(self._remote(uid + '.epub'), self._local(uid))
+    with self.sftp_lock:
+      # self.scp.get(self._remote(uid), self._local(uid), recursive=True)
+      if self._isfile(self._remote(uid + '.pdf')):
+        self.scp.get(self._remote(uid + '.pdf'), self._local(uid))
+      if self._isfile(self._remote(uid + '.epub')):
+        self.scp.get(self._remote(uid + '.epub'), self._local(uid))
 
   def exists(self, *filename, ext=None):
     if ext:
@@ -308,48 +326,57 @@ class LiveFileSourceSSH(FileSource):
   def listItems(self):
     if self._allUids is None:
       self._allUids = []
-      for entry in self.sftp.listdir(self._remote()):
-        name = path.splitext(entry)
-        if name[1] == ".metadata":
-          self._allUids.append(name[0])
+      with self.sftp_lock:
+        for entry in self.sftp.listdir(self._remote()):
+          name = path.splitext(entry)
+          if name[1] == ".metadata":
+            self._allUids.append(name[0])
     return self._allUids
 
   def listSubItems(self, uid, ext="rm"):
     folder = self._remote(uid)
     ext = '.' + ext
     try:
-      for entry in self.sftp.listdir(folder):
-        name = path.splitext(entry)
-        if name[1] == ext:
-          yield name[0]
+      with self.sftp_lock:
+        for entry in self.sftp.listdir(folder):
+          name = path.splitext(entry)
+          if name[1] == ext:
+            yield name[0]
     except Exception as e:
       return
 
   def upload(self, local, *remote, progress=None, overwrite=False):
-    if overwrite or not self._isfile(self._remote(*remote)):
-      self.sftp.put(local, self._remote(*remote))
-      self._dirty = True
-      return True
+    with self.sftp_lock:
+      if overwrite or not self._isfile(self._remote(*remote)):
+        self.sftp.put(local, self._remote(*remote))
+        self._dirty = True
+        return True
     return False
 
   def store(self, content, *remote, progress=None, overwrite=False):
-    if overwrite or not self._isfile(self._remote(*remote)):
-      with self.sftp.open(self._remote(*remote), 'w') as f:
-        if type(content) is str:
-          f.write(content)
-        else:
-          json.dump(content, f, indent=4)
-      self._dirty = True
-      return True
+    with self.sftp_lock:
+      if overwrite or not self._isfile(self._remote(*remote)):
+        with self.sftp.open(self._remote(*remote), 'w') as f:
+          if type(content) is str:
+            f.write(content)
+          else:
+            json.dump(content, f, indent=4)
+        self._dirty = True
+        return True
     return False
 
   def makeDir(self, *remote):
     try:
-      self.sftp.mkdir(self._remote(*remote))
+      with self.sftp_lock:
+        self.sftp.mkdir(self._remote(*remote))
       self._dirty = True
       return True
     except:
       return False
+
+  def close(self):
+    self.sftp.close()
+    self.ssh.close()
 
 
 
@@ -358,11 +385,11 @@ class LiveFileSourceRsync(LiveFileSourceSSH):
   RSYNC = [ which("rsync") ]
   _updated = {}
 
-  def __init__(self, name, ssh, data_dir,
+  def __init__(self, ssh, data_dir, name="Rsync",
                username="root", host="10.11.99.1", key=None,
                rsync_path=None, rsync_options=None, remote_documents=None, remote_templates=None,
-               use_banner=False, cache_mode="on_demand", **kw):
-    LiveFileSourceSSH.__init__(self, name, ssh, cache_dir=data_dir,
+               use_banner=False, cache_mode="on_demand", known_hosts=None, host_key_policy="ask", **kw):
+    LiveFileSourceSSH.__init__(self, ssh, name=name, cache_dir=data_dir,
                                remote_documents=remote_documents, remote_templates=remote_templates,
                                use_banner=use_banner, connect=False)
 
@@ -374,14 +401,25 @@ class LiveFileSourceRsync(LiveFileSourceSSH):
 
     if rsync_path:
       self.RSYNC = [ rsync_path ]
+
+    ssh_config = ['-e', '%s -o batchmode=yes' % which("ssh")]
     if key:
-      self.RSYNC.append("-e")
-      self.RSYNC.append("%s -i \"%s\"" % (which("ssh"), key))
+      ssh_config[-1] += ' -i "%s"' % key
+    if host_key_policy == "ignore_all":
+      ssh_config[-1] += ' -o stricthostkeychecking=no'
+    if known_hosts and known_hosts.is_file():
+      ssh_config[-1] += ' -o userknownhostsfile="%s"' % known_hosts.resolve()
+    self.RSYNC += ssh_config
+
     if rsync_options:
       if type(rsync_options) == str:
         self.RSYNC.append(rsync_options)
       else:
         self.RSYNC +=rsync_options
+
+
+    log.debug("RSYNC: %s", self.RSYNC)
+
 
     self._bulk_download(
       self._remote(branch=TEMPLDIR),
@@ -403,7 +441,7 @@ class LiveFileSourceRsync(LiveFileSourceSSH):
   def _remote_rsync(self, path):
     return "%s@%s:'%s'" % (self.username, self.host, path)
 
-  def _bulk_download(self, fr, to, excludes=['*'], includes=[], delete=True):
+  def _bulk_download(self, fr, to, excludes=['*'], includes=[], delete=True, progress=None):
     cmd = self.RSYNC + ['-vaz', '--prune-empty-dirs']
     if delete:
       cmd.append('--delete')
@@ -415,7 +453,12 @@ class LiveFileSourceRsync(LiveFileSourceSSH):
       cmd.append(e)
     cmd.append(self._remote_rsync(fr + "/"))
     cmd.append(to)
-    return subprocess.run(cmd)
+    if progress:
+      with subprocess.Popen(cmd, stdout=subprocess.PIPE) as p:
+        for l in p.stdout:
+          progress(0,0,"Synching "+l.decode().strip())
+    else:
+      return subprocess.run(cmd)
 
   def _file_download(self, fr, to):
     dirname = path.dirname(to)
@@ -452,14 +495,16 @@ class LiveFileSourceRsync(LiveFileSourceSSH):
     else:
       _excludes = [ '*' ]
       _includes = ['*.metadata', '*.content', '*.pagedata']
-    self._bulk_download(self._remote(), self._local(), includes=_includes, excludes=_excludes)
+    self._bulk_download(self._remote(), self._local(),
+                        includes=_includes, excludes=_excludes,
+                        progress=progress)
     with os.scandir(self._local()) as entries:
       for entry in entries:
         if entry.is_file():
           self._updated[entry.path] = True
 
   def prefetchDocument(self, uid, progress=None, force=False):
-    self._bulk_download(self._remote(uid), self._local(uid), excludes=[])
+    self._bulk_download(self._remote(uid), self._local(uid), excludes=[], progress=progress)
     with os.scandir(self._local(uid)) as entries:
       for entry in entries:
         if entry.is_file():
@@ -469,46 +514,5 @@ class LiveFileSourceRsync(LiveFileSourceSSH):
     if self._dirty:
       _,out,_ = self.ssh.exec_command("/bin/systemctl restart xochitl")
       out.channel.recv_exit_status()
-
-
-
-
-
-# Factory
-
-def fileSourceFromSSH(cls, name="SSH", host='10.11.99.1', username='root', password=None, key=None, timeout=1, **kw):
-  # try:
-    client = paramiko.SSHClient()
-    client.load_system_host_keys()
-
-    if key is not None:
-      key = os.path.expanduser(key)
-      try:
-        pkey = paramiko.RSAKey.from_private_key_file(key)
-      except paramiko.ssh_exception.PasswordRequiredException:
-        passphrase, ok = QInputDialog.getText(None, "Configuration","SSH key passphrase:", QLineEdit.Password)
-        if ok:
-          pkey = paramiko.RSAKey.from_private_key_file(key, password=passphrase)
-        else:
-          raise Exception("A passphrase for SSH key is required")
-    else:
-      # as a last option we can try to let paramiko handle the keys
-      pkey=None
-
-    options = {
-      'username': username,
-      'password': password,
-      'pkey': pkey,
-      'timeout': timeout,
-      'look_for_keys': pkey is None
-    }
-    log.info('Connecting...') # pkey=key,
-    client.connect(host, **options)
-    log.info("Connected to %s", host)
-    return cls(name, client, username=username, host=host, key=key, **kw)
-  # except Exception as e:
-  #   log.error("Could not connect to %s: %s", address, e)
-  #   log.error("Please check your remarkable is connected and retry.")
-  #   return None
 
 

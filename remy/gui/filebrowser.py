@@ -143,7 +143,6 @@ class InfoPanel(QWidget):
     self.index = index
     self.rootName = index.fsource.name
     self.readOnly = index.isReadOnly()
-    self.thumbs = {}
     layout = self.layout = QVBoxLayout()
     icon = self.icon = QLabel()
     title = self.title = QLabel()
@@ -252,6 +251,7 @@ class InfoPanel(QWidget):
         tgen.signals.thumbReady.connect(self._onThumb)
         QThreadPool.globalInstance().start(tgen)
 
+InfoPanel.thumbs = {}
 
 class PinnedDelegate(QStyledItemDelegate):
 
