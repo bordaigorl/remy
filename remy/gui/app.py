@@ -66,6 +66,13 @@ class RemyApp(QApplication):
           sys.exit(2)
       config.selectSource(source)
 
+
+    self.aboutToQuit.connect(self.joinWorkers)
+
+  @pyqtSlot()
+  def joinWorkers(self):
+    QThreadPool.globalInstance().waitForDone()
+
   def sourceSelectionBox(self):
     sources = self.config.get('sources')
     return QInputDialog.getItem(
