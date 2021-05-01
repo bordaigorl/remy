@@ -22,5 +22,6 @@
     <file>assets/remy.svg</file>
     <file>assets/bookmark.svg</file>
     <file>assets/dead.svg</file>
+    <file>assets/loading.gif</file>
 </qresource>
 </RCC>

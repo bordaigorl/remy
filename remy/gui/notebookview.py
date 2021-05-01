@@ -99,10 +99,9 @@ class NotebookViewer(QGraphicsView):
     self._page = 0
     self._templates = {}
     # we only support pdfs for the forseable future
-    if isinstance(document, PDFDoc):
-      self._maxPage = document.baseDocument().numPages() - 1
-    else:
-      self._maxPage = document.pageCount - 1
+    self._maxPage = document.pageCount - 1
+    # if isinstance(document, PDFDoc):
+    #   self._maxPage = document.baseDocument().numPages() - 1
     self.loadPage(document.lastOpenedPage or 0)
 
     self.show()
@@ -131,57 +130,69 @@ class NotebookViewer(QGraphicsView):
     else:
       return QImage()
 
-  def pixmapOfBackground(self, bg):
+  def imageOfBackground(self, bg):
     if bg and bg.name not in self._templates:
       bgf = bg.retrieve()
       if bgf:
-        self._templates[bg.name] = QPixmap.fromImage(QImage(bgf))
+        self._templates[bg.name] = QImage(bgf)
       else:
         return None
     return self._templates[bg.name]
 
-  def makePageScene(self, i, forViewing=True, simplify=0, smoothen=False, eraser_mode="ignore", pencil_resolution=.4):
-    page = self.document.getPage(i)
-    scene = QGraphicsScene()
-    r = scene.addRect(0,0,rm.WIDTH, rm.HEIGHT)
+  def loadPage(self, i):
+    ermode = self.options.get("eraser_mode", "ignore")
+    pres = self.options.get("pencil_resolution", 0.4)
+    scene = self.makePageScene(i, eraser_mode=ermode, pencil_resolution=pres)
+    self.setScene(scene)
+    self._page = i
+    self.refreshTitle()
+
+  def makePageScene(self, i, **options):
+    if i in self._page_cache:
+      return self._page_cache[i]
+
+    scene = self._page_cache[i] = QGraphicsScene()
+    r = scene.pageRect = scene.addRect(0,0,rm.WIDTH, rm.HEIGHT)
     r.setFlag(QGraphicsItem.ItemClipsChildrenToShape)
-    if forViewing:
-      r.setBrush(Qt.white)
-    # try:
+    r.setBrush(Qt.white)
+
+    scene.loadingItem = QLoadingItem(r)
+    # scene.loadingItem.setRotation(-scene.rotation())
+
+    # lw = scene.loadingItem.boundingRect().width()
+    # scene.loadingItem.setPos(r.rect().center() - QPointF(lw/2,12))
+    scene.loadingItem.setPos(r.rect().center())
+
+
+    w = AsyncPageLoad(self.document, i, **options)
+    w.signals.pageReady.connect(self.pageReady)
+    QThreadPool.globalInstance().start(w)
+    return scene
+
+
+  @pyqtSlot(Page, PageGraphicsItem, QImage)
+  def pageReady(self, page, pitem, img):
+    scene = self._page_cache[page.pageNum]
     if page.background and page.background.name != "Blank":
-      img = self.pixmapOfBackground(page.background)
+      img = self.imageOfBackground(page.background)
       if img:
-        scene.baseItem = QGraphicsPixmapItem(img, r)
-    # if isinstance(page.background, PDFDocPage) and page.background.path() != self.document.baseDocument():
-    #   print("Not supported for the moment") # narrow usecase
-    elif forViewing and self.document.baseDocument():
-      # todo: adapt the oversampling based on QGraphicsView scale
-      img = self.imageOfBasePdf(i, 2)
-      img = QGraphicsPixmapItem(QPixmap(img), r)
+        scene.baseItem = QGraphicsPixmapItem(QPixmap(img), scene.pageRect)
+    elif img:
+      img = QGraphicsPixmapItem(QPixmap(img), scene.pageRect)
       img.setTransformationMode(Qt.SmoothTransformation)
       img.setScale(1/2)
       scene.baseItem = img
     else:
       scene.baseItem = None
-    # except Exception as e:
-      # print("Too bad, can't open background %s" % e)
-    PageGraphicsItem(page, scene=scene, simplify=simplify, smoothen=smoothen, eraser_mode=eraser_mode, pencil_resolution=pencil_resolution, parent=r)
-    scene.setSceneRect(r.rect())
-    if forViewing:
-      r=scene.addRect(0,0,rm.WIDTH, rm.HEIGHT)
-      r.setPen(Qt.black)
-    return scene
+    scene.removeItem(scene.loadingItem)
+    pitem.setParentItem(scene.pageRect)
+    scene.setSceneRect(scene.pageRect.rect())
+    r=scene.addRect(0,0,rm.WIDTH, rm.HEIGHT)
+    r.setPen(Qt.black)
+    if isinstance(self.document, PDFDoc):
+      self._maxPage = self.document.baseDocument().numPages() - 1
+      self.refreshTitle()
 
-  def loadPage(self, i):
-    T0 = time.perf_counter()
-    ermode = self.options.get("eraser_mode", "ignore")
-    pres = self.options.get("pencil_resolution", 0.4)
-    if i not in self._page_cache:
-      self._page_cache[i] = self.makePageScene(i, eraser_mode=ermode, pencil_resolution=pres)
-    self.setScene(self._page_cache[i])
-    self._page = i
-    self.refreshTitle()
-    log.debug('LOAD PAGE %d: %f', i, time.perf_counter() - T0)
 
   def resetSize(self, ratio):
     dg = QApplication.desktop().availableGeometry(self)
@@ -349,4 +360,77 @@ class NotebookViewer(QGraphicsView):
         self._tolerance[i] += .5
       self._page_cache[i] = self.makePageScene(i, simplify=self._tolerance[i], smoothen=self._smoothen)
       self.setScene(self._page_cache[i])
+
+
+class AsyncPageLoadSignals(QObject):
+  pageReady = pyqtSignal(Page, PageGraphicsItem, QImage)
+
+class AsyncPageLoad(QRunnable):
+
+  def __init__(self, document, i, **kw):
+    QRunnable.__init__(self)
+    self.document = document
+    self.pageNum = i
+    self.options = kw
+    self.signals = AsyncPageLoadSignals()
+
+  def imageOfBasePdf(self, mult=1):
+    pdf = self.document.baseDocument()
+    if pdf:
+      page = pdf.page(self.pageNum)
+      s = page.pageSize()
+      w, h = s.width(), s.height()
+      if w <= h:
+        ratio = min(WIDTH / w, HEIGHT / h)
+      else:
+        ratio = min(HEIGHT / w, WIDTH / h)
+      xres = 72.0 * ratio * mult
+      yres = 72.0 * ratio * mult
+      if w <= h:
+        return page.renderToImage(xres, yres)
+      else:
+        return page.renderToImage(xres, yres, -1,-1,-1,-1, page.Rotate270)
+    else:
+      return QImage()
+
+  def run(self):
+    page = self.document.getPage(self.pageNum)
+    # try:
+    img = QImage()
+    if page.background and page.background.name != "Blank":
+      page.background.retrieve()
+      # images are cached
+    elif self.document.baseDocument():
+      # todo: adapt the oversampling based on QGraphicsView scale
+      img = self.imageOfBasePdf(2)
+    p = PageGraphicsItem(page, **self.options)
+    self.signals.pageReady.emit(page, p, img)
+
+
+
+class QLoadingItem(QGraphicsRectItem):
+
+  def __init__(self, parent=None):
+    QGraphicsItem.__init__(self, parent=parent)
+    self.setFlag(QGraphicsItem.ItemIgnoresTransformations)
+    ###
+    img = QMovie(":assets/loading.gif")
+    imgw = QLabel()
+    imgw.setMovie(img)
+    img.setScaledSize(QSize(40,40))
+    spinner = self.spinner = QGraphicsProxyWidget(self)
+    spinner.setWidget(imgw)
+    img.start()
+    ###
+    font=QFont()
+    font.setPointSize(14)
+    lbl = QGraphicsSimpleTextItem("Loading", self)
+    lbl.setFont(font)
+    lbl.setBrush(Qt.gray)
+    lblr = lbl.boundingRect()
+    lbl.setPos(-lblr.width()/2,30)
+    # lbl.setPos(-lblr.width()/2,-lblr.height()/2)
+    spinner.setPos(-20,-20)
+    # spinner.setPos(-lblr.width()/2-40,-15)
+    lbl.setText("Loading…")
 
