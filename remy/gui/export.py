@@ -71,6 +71,18 @@ def pdfrotate(outputPath, rotate=0):
   with open(outputPath, 'wb') as out:
     writer.write(out)
 
+def transformDest(d, rot, ratio, tx, ty):
+  if d['/Type'] == '/XYZ':
+    if rot == 90:
+      l = d.left
+      t = d.top
+      d['/Left'] = t*ratio+tx
+      d['/Top'] = l*ratio+ty
+    else: 
+      d['/Left'] = d.left*ratio+tx
+      d['/Top'] = d.top*ratio+ty
+  return d
+
 def transformAnnot(p, rot, ratio, tx, ty):
   """transform the Annotations of a pdf page (takes the page and the same arguments like mergeRotatedScaledTranslatedPage)"""
   if '/Annots' in p:
@@ -149,7 +161,11 @@ def pdfmerge(basePath, outputPath, pdfRanges=None, rotate=0, progress=None, tran
     writer.addPage(np)
     _progress(progress, page, pageNum + 1)
   for nd in baseReader.getNamedDestinations():
-    writer.addNamedDestinationObject(baseReader.namedDestinations[nd])
+    # FIXME it woulb be nicer to use and transform the dest if applicable
+    # writer.addNamedDestinationObject(baseReader.namedDestinations[nd])
+    print(nd)
+    print(baseReader.namedDestinations[nd].page)
+    # writer.addNamedDestination(nd, )
 
   with open(outputPath, 'wb') as out:
     writer.write(out)
