@@ -46,6 +46,7 @@ def scenesPdf(scenes, outputPath, progress=None):
   printer.setOutputFileName(outputPath)
   printer.setPaperSize(QSizeF(HEIGHT_MM,WIDTH_MM), QPrinter.Millimeter)
   printer.setPageMargins(0,0,0,0, QPrinter.Millimeter)
+  printer.setCreator('Remy')
   p=QPainter()
   p.begin(printer)
   try:
