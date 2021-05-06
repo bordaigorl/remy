@@ -456,6 +456,11 @@ class ExportDialog(QDialog):
     colorsel.addWidget(self.highlight, 1, 1)
     form.addRow("Colors:", colorsel)
 
+    # pencilRes = self.pencilRes = QDoubleSpinBox()
+    # pencilRes.setMinimum(0)
+    # pencilRes.setSingleStep(0.5)
+    # form.addRow("Pencil scale:", pencilRes)
+
 
     layout = QVBoxLayout()
     layout.addLayout(form)
@@ -507,6 +512,7 @@ class ExportDialog(QDialog):
     self.gray.setColor(QColor(colors.get("gray", DEFAULT_COLORS[1])))
     self.white.setColor(QColor(colors.get("white", DEFAULT_COLORS[2])))
     self.highlight.setColor(QColor(colors.get("highlight", DEFAULT_HIGHLIGHT)))
+    # self.pencilRes.setValue(self.options.get("pencil_resolution", 0.4))
 
   def getOptions(self):
     return (
@@ -524,7 +530,8 @@ class ExportDialog(QDialog):
           'gray': self.gray.color(),
           'white': self.white.color(),
           'highlight': self.highlight.color(),
-        }
+        },
+        # 'pencil_resolution': self.pencilRes.value(),
       }
     )
 

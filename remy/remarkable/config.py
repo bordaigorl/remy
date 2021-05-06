@@ -44,7 +44,7 @@ OPTIONS_DEFAULTS = {
     "orientation": "auto",
     "smoothen": False,
     "simplify": 0,
-    "pencil_resolution": 0.4, # unused for now but support will come
+    "pencil_resolution": 0.4, # Alas QPrinter ignores QBrush's transforms
     "colors": {
       "black": "black",
       "gray": "#bbbbbb",
