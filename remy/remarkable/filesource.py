@@ -417,9 +417,7 @@ class LiveFileSourceRsync(LiveFileSourceSSH):
       else:
         self.RSYNC +=rsync_options
 
-
     log.debug("RSYNC: %s", self.RSYNC)
-
 
     self._bulk_download(
       self._remote(branch=TEMPLDIR),
@@ -505,6 +503,7 @@ class LiveFileSourceRsync(LiveFileSourceSSH):
 
   def prefetchDocument(self, uid, progress=None, force=False):
     self._bulk_download(self._remote(uid), self._local(uid), excludes=[], progress=progress)
+    self._bulk_download(self._remote(uid + '.highlights'), self._local(uid), excludes=[], progress=progress)
     with os.scandir(self._local(uid)) as entries:
       for entry in entries:
         if entry.is_file():

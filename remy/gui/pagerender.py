@@ -195,6 +195,15 @@ class PageGraphicsItem(QGraphicsRectItem):
     _progress(progress,curStroke,totalStrokes); curStroke += 1
 
     for l in page.layers:
+      if l.highlights:
+        h = QGraphicsRectItem(self)
+        h.setPen(QPen(Qt.NoPen))
+        for hi in l.highlights:
+          for r in hi.get('rects', []):
+            ri = QGraphicsRectItem(r.get('x',0),r.get('y',0),r.get('width',0), r.get('height',0), h)
+            ri.setPen(QPen(Qt.NoPen))
+            ri.setBrush(highlight)
+            ri.setToolTip(hi.get('text',''))
       group = QGraphicsPathItem()
       group.setPen(noPen)
       if eraser_mode >= AUTO_ERASER:

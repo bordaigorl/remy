@@ -201,10 +201,23 @@ class Document(Entry):
         with open(mfile, 'r') as f:
           layerNames = json.load(f)
         layerNames = layerNames["layers"]
-      except:
+      except Exception:
         layerNames = [{"name": "Layer %d" % j} for j in range(len(layers))]
+
+      highlights = {}
+      try:
+        if self.fsource.exists(self.uid + '.highlights', pid, ext='json'):
+          hfile = self.fsource.retrieve(self.uid + '.highlights', pid, ext='json')
+          with open(hfile, 'r') as f:
+            h = json.load(f).get('highlights', [])
+          for i in range(len(h)):
+            highlights[i] = h[i]
+      except Exception:
+        pass # empty highlights are ok
+
       for j in range(len(layers)):
-        layers[j] = Layer(layers[j], layerNames[j].get("name"))
+        layers[j] = Layer(layers[j], layerNames[j].get("name"), highlights.get(j, []))
+
     return self._makePage(layers, ver, pageNum)
 
   def _makePage(self, layers, version, pageNum):
