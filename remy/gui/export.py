@@ -446,9 +446,10 @@ class ExportDialog(QDialog):
 
     # COLOR SELECTION
     colorsel = QGridLayout()
-    self.black = self.ColorButton("Black")
-    self.gray = self.ColorButton("Gray")
-    self.white = self.ColorButton("White")
+    colorsel.setContentsMargins(0,0,0,0)
+    self.black = self.ColorButton("Black", options=QColorDialog.ShowAlphaChannel)
+    self.gray = self.ColorButton("Gray", options=QColorDialog.ShowAlphaChannel)
+    self.white = self.ColorButton("White", options=QColorDialog.ShowAlphaChannel)
     self.highlight = self.ColorButton("Highlight", options=QColorDialog.ShowAlphaChannel)
     colorsel.addWidget(self.black, 0, 0)
     colorsel.addWidget(self.gray, 0, 1)
