@@ -39,7 +39,7 @@ def _progress(p, i, t):
   if callable(p):
     p(i, t)
 
-def scenesPdf(scenes, outputPath, progress=None):
+def scenesPdf(scenes, pages, outputPath, progress=None, tot=0):
   printer = QPrinter(QPrinter.HighResolution)
   printer.setOutputFormat(QPrinter.PdfFormat)
   # printer.setPageSize(QPrinter.A4)
@@ -50,12 +50,12 @@ def scenesPdf(scenes, outputPath, progress=None):
   p=QPainter()
   p.begin(printer)
   try:
-    _progress(progress, 0, len(scenes))
-    for i in range(len(scenes)):
+    _progress(progress, 0, tot)
+    for (i,scene) in enumerate(scenes(pages)):
       if i > 0:
         printer.newPage()
-      scenes[i].render(p)
-      _progress(progress, i+1, len(scenes))
+      scene.render(p)
+      _progress(progress, i+1, tot)
   except Exception as e:
     raise e
   finally:
@@ -233,17 +233,16 @@ class Exporter(QThread):
 
       pages = chain(*ranges)
 
-      self.onNewPhase.emit("Rendering lines")
-      self._progress()
-      def pr(*a):
-        # QCoreApplication.processEvents()
-        if self._cancel:
-          raise CancelledExporter("Export was cancelled")
-      for i in pages:
-        scenes.append(BarePageScene(self.document.getPage(i), progress=pr, **self.options))
-        self._progress()
+      # self.onNewPhase.emit("Rendering lines")
+      # self._progress()
+      # def pr(*a):
+      #   if self._cancel:
+      #     raise CancelledExporter("Export was cancelled")
+      # for i in pages:
+      #   scenes.append(BarePageScene(self.document.getPage(i), progress=pr, **self.options))
+      #   self._progress()
       self.onNewPhase.emit("Generating PDF of lines")
-      scenesPdf(scenes, self.filename, progress=self._progress)
+      scenesPdf(self.genScenes, pages, self.filename, progress=self._progress, tot=steps)
       if pdf:
         self.onNewPhase.emit("Merging with original PDF")
         pdfmerge(pdf, self.filename, pdfRanges=ranges, rotate=90 if rot else 0, progress=self._progress)
@@ -255,6 +254,13 @@ class Exporter(QThread):
       log.warning("Exception on exporting: %s", e)
       self.onError.emit(e)
 
+  def genScenes(self, pages):
+    def pr(*a):
+      if self._cancel:
+        raise CancelledExporter("Export was cancelled")
+    # ---
+    for i in pages:
+      yield BarePageScene(self.document.getPage(i), progress=pr, **self.options)
 
 class ExportOperation(QObject):
 
@@ -266,7 +272,7 @@ class ExportOperation(QObject):
     self.dialog = QProgressDialog(parent=self.parent())
     self.dialog.setWindowTitle("Exporting %s" % self.name)
     self.dialog.setLabelText("Initialising...")
-    self.dialog.setMinimumDuration(2000)
+    self.dialog.setMinimumDuration(500)
     self.dialog.setAutoClose(True)
     exporter = Exporter(filename, document, **kwargs, parent=self)
     exporter.onError.connect(self.onError)
