@@ -221,6 +221,18 @@ def parsePageRanges(whichPages, document=None):
   return [slice(*parsePageRange(s)) for s in whichPages.split(',')]
 
 
+import json
+
+def parseExcludeLayers(exclude_layers):
+  return set(json.loads('[%s]' % exclude_layers))
+
+def validateExcludeLayers(exclude_layers):
+  try:
+    json.loads('[%s]' % exclude_layers)
+    return True
+  except Exception:
+    return False
+
 from itertools import chain
 
 class CancelledExporter(Exception):
@@ -484,6 +496,19 @@ class ExportDialog(QDialog):
     includeBase = self.includeBase = QCheckBox("Include template/base document")
     form.addRow("", includeBase)
 
+    # EXCLUDE LAYERS
+    exclLayers = self.exclLayers = QLineEdit()
+    exclLayers.setPlaceholderText("none")
+    act = exclLayers.addAction(QIcon(":assets/symbolic/info.svg"), QLineEdit.TrailingPosition)
+    act.setToolTip('Examples:\nBy layer number: 1,5\nBy layer name: "guides","grid"\nMixed: 1,"guides"\nOnly highlights of a layer: "1/highlights","annot/highlights"')
+    act = exclLayers.addAction(QIcon(":assets/symbolic/error.svg"), QLineEdit.TrailingPosition)
+    self.exclLayersInvalid = act
+    act.setToolTip("List of excluded layers is invalid")
+    act.triggered.connect(self.exclLayers.clear)
+    act.setVisible(False)
+    exclLayers.textChanged.connect(self.validateExcludeLayers)
+    form.addRow("Exclude layers:", exclLayers)
+
     # ERASER MODE
     emode = self.eraserMode = QComboBox()
     emode.addItem("Auto", "auto")
@@ -519,7 +544,10 @@ class ExportDialog(QDialog):
     # pencilRes.setMinimum(0)
     # pencilRes.setSingleStep(0.5)
     # form.addRow("Pencil scale:", pencilRes)
-
+    pencilMode = self.pencilMode = QComboBox()
+    pencilMode.addItem("Textured", 1)
+    pencilMode.addItem("Grayscale", 0)
+    form.addRow("Pencil mode:", pencilMode)
 
     layout = QVBoxLayout()
     layout.addLayout(form)
@@ -548,11 +576,17 @@ class ExportDialog(QDialog):
     v = not validatePageRanges(text)
     self.pageRangeInvalid.setVisible(v)
 
+  @pyqtSlot(str)
+  def validateExcludeLayers(self, text):
+    v = not validateExcludeLayers(text)
+    self.exclLayersInvalid.setVisible(v)
+
   @pyqtSlot(bool)
   def reset(self, *args):
     self.pathsel.setText(self.filename or "Document.pdf")
     self.openExp.setChecked(self.options.get("open_exported", False))
     self.pageRanges.clear()
+    self.exclLayers.clear() # makes little sense to get it from args
 
     emi = self.eraserMode.findData(self.options.get("eraser_mode", "ignore"))
     if emi < 0: emi = 1
@@ -573,6 +607,10 @@ class ExportDialog(QDialog):
     self.highlight.setColor(QColor(colors.get("highlight", DEFAULT_HIGHLIGHT)))
     # self.pencilRes.setValue(self.options.get("pencil_resolution", 0.4))
 
+    pmi = self.pencilMode.findData(self.options.get("pencil_resolution", 1))
+    if pmi < 0: pmi = 0
+    self.pencilMode.setCurrentIndex(pmi)
+
   def getOptions(self):
     return (
       self.pathsel.text(),
@@ -590,9 +628,11 @@ class ExportDialog(QDialog):
           'white': self.white.color(),
           'highlight': self.highlight.color(),
         },
-        # 'pencil_resolution': self.pencilRes.value(),
+        'exclude_layers': parseExcludeLayers(self.exclLayers.text()),
+        'pencil_resolution': self.pencilMode.currentData(),
       }
     )
+
 
 def exportDocument(doc, parent=None):
   ok = True
@@ -610,6 +650,7 @@ def exportDocument(doc, parent=None):
     op.run(filename, doc, whichPages=whichPages, **opt)
     return op
   return None
+
 
 def webUIExport(doc, filename=None, parent=None):
   ok = True
