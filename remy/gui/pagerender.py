@@ -161,6 +161,7 @@ class PageGraphicsItem(QGraphicsRectItem):
       eraser_mode=AUTO_ERASER,
       parent=None,
       progress=None,
+      exclude_layers=set()
   ):
     super().__init__(0,0,rm.WIDTH,rm.HEIGHT,parent)
 
@@ -194,8 +195,13 @@ class PageGraphicsItem(QGraphicsRectItem):
     curStroke = 0
     _progress(progress,curStroke,totalStrokes); curStroke += 1
 
-    for l in page.layers:
-      if l.highlights:
+    for li, l in enumerate(page.layers):
+      if li+1 in exclude_layers or l.name in exclude_layers:
+        continue
+      if (l.highlights
+          and l.name + "/highlights" not in exclude_layers
+          and str(li+1) + "/highlights" not in exclude_layers):
+        # then
         h = QGraphicsRectItem(self)
         h.setPen(QPen(Qt.NoPen))
         for hi in l.highlights:
@@ -382,7 +388,7 @@ class ThumbnailWorker(QRunnable):
   def run(self):
     try:
       d = self.index.get(self.uid)
-      log.info("Generating thumb for %s", d.name())
+      log.debug("Generating thumb for %s", d.name())
       page = d.getPage(d.cover())
       s = BarePageScene(page,
                         include_base_layer=False,
