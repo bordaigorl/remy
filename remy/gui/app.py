@@ -301,6 +301,11 @@ class RemyInitWorker(QRunnable):
 
   def run(self):
     args = self.args
+
+    # host should be assumed to be the address (unless specified otherwise)
+    if "host" in args and not "address" in args:
+      args["address"] = args["host"]
+
     app = QApplication.instance()
     fsource = None
     try:
