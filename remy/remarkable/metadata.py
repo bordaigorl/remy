@@ -228,7 +228,7 @@ class Document(Entry):
 
   def retrieveBaseDocument(self):
     b = self.baseDocumentName()
-    if b:
+    if b and self.fsource.exists(b):
       return self.fsource.retrieve(b)
     return None
 
@@ -273,7 +273,7 @@ class Notebook(Document):
     return Page(layers, version, pageNum, document=self, background=template)
 
 
-class PDFDoc(Document):
+class PDFBasedDoc(Document):
 
   _pdf = None
 
@@ -289,6 +289,9 @@ class PDFDoc(Document):
     from popplerqt5 import Poppler
     if self._pdf is None:
       doc = self.retrieveBaseDocument()
+      if doc is None:
+        log.warning("Base document for %s could not be found", self.uid)
+        return None
       self._pdf = Poppler.Document.load(doc)
       self._pdf.setRenderHint(Poppler.Document.Antialiasing)
       self._pdf.setRenderHint(Poppler.Document.TextAntialiasing)
@@ -301,10 +304,17 @@ class PDFDoc(Document):
   def baseDocumentName(self):
     return self.uid + '.pdf'
 
+  def originalName(self):
+    return self.uid + '.pdf'
 
-class EBook(Document):
 
-  def baseDocumentName(self):
+class PDFDoc(PDFBasedDoc):
+  pass
+
+
+class EBook(PDFBasedDoc):
+
+  def originalName(self):
     return self.uid + '.epub'
 
 
