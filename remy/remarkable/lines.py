@@ -7,7 +7,7 @@ import json
 import os.path
 
 
-Layer = namedtuple('Layer', ['strokes', 'name'])
+Layer = namedtuple('Layer', ['strokes', 'name', 'highlights'])
 
 Stroke = namedtuple(
   'Stroke',

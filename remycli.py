@@ -2,11 +2,10 @@ import remy
 from remy.remarkable.metadata import *
 from remy.remarkable.filesource import LocalFileSource
 
+import os
+
 # from fuzzywuzzy import process
 # highest = process.extractOne(str2Match,strOptions)
-
-where = "/Users/bordaigorl/Documents/reMarkable/backup/latest"
-templ = "/Users/bordaigorl/Work/Code/reMarkable/built-in/2.1/templates"
 
 
 def filter_by_field(f, v, docs):
@@ -68,8 +67,12 @@ def list_trash(docs):
 
 _test_pwd = None
 
-def load(where=where, templ=templ):
+def load(where=None, templ=None):
   global _test_pwd
+  if where is None:
+    where = os.environ.get('REMYCLI_DOCS','.')
+  if templ is None:
+    templ = os.environ.get('REMYCLI_TEMPL', '.')
   docs = RemarkableIndex(LocalFileSource("Backup", where, templ))
   _test_pwd = [ROOT_ID, docs]
   list_folder(docs)

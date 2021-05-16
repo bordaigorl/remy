@@ -46,6 +46,7 @@ def scenesPdf(scenes, outputPath, progress=None):
   printer.setOutputFileName(outputPath)
   printer.setPaperSize(QSizeF(HEIGHT_MM,WIDTH_MM), QPrinter.Millimeter)
   printer.setPageMargins(0,0,0,0, QPrinter.Millimeter)
+  printer.setCreator('Remy')
   p=QPainter()
   p.begin(printer)
   try:
@@ -497,15 +498,21 @@ class ExportDialog(QDialog):
 
     # COLOR SELECTION
     colorsel = QGridLayout()
-    self.black = self.ColorButton("Black")
-    self.gray = self.ColorButton("Gray")
-    self.white = self.ColorButton("White")
+    colorsel.setContentsMargins(0,0,0,0)
+    self.black = self.ColorButton("Black", options=QColorDialog.ShowAlphaChannel)
+    self.gray = self.ColorButton("Gray", options=QColorDialog.ShowAlphaChannel)
+    self.white = self.ColorButton("White", options=QColorDialog.ShowAlphaChannel)
     self.highlight = self.ColorButton("Highlight", options=QColorDialog.ShowAlphaChannel)
     colorsel.addWidget(self.black, 0, 0)
     colorsel.addWidget(self.gray, 0, 1)
     colorsel.addWidget(self.white, 1, 0)
     colorsel.addWidget(self.highlight, 1, 1)
     form.addRow("Colors:", colorsel)
+
+    # pencilRes = self.pencilRes = QDoubleSpinBox()
+    # pencilRes.setMinimum(0)
+    # pencilRes.setSingleStep(0.5)
+    # form.addRow("Pencil scale:", pencilRes)
 
 
     layout = QVBoxLayout()
@@ -558,6 +565,7 @@ class ExportDialog(QDialog):
     self.gray.setColor(QColor(colors.get("gray", DEFAULT_COLORS[1])))
     self.white.setColor(QColor(colors.get("white", DEFAULT_COLORS[2])))
     self.highlight.setColor(QColor(colors.get("highlight", DEFAULT_HIGHLIGHT)))
+    # self.pencilRes.setValue(self.options.get("pencil_resolution", 0.4))
 
   def getOptions(self):
     return (
@@ -575,13 +583,14 @@ class ExportDialog(QDialog):
           'gray': self.gray.color(),
           'white': self.white.color(),
           'highlight': self.highlight.color(),
-        }
+        },
+        # 'pencil_resolution': self.pencilRes.value(),
       }
     )
 
 def exportDocument(doc, parent=None):
   ok = True
-  opt = QApplication.instance().config.get("export", {})
+  opt = QApplication.instance().config.export
   filename = doc.visibleName
   if not filename.endswith(".pdf"):
     filename += ".pdf"
@@ -598,7 +607,7 @@ def exportDocument(doc, parent=None):
 
 def webUIExport(doc, filename=None, parent=None):
   ok = True
-  opt = QApplication.instance().config.get("export", {})
+  opt = QApplication.instance().config.export
   if filename is None:
     filename = doc.visibleName
     if not filename.endswith(".pdf"):

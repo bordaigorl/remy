@@ -5,6 +5,7 @@ from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 
 from remy.remarkable.metadata import *
+from remy.gui.pagerender import ThumbnailWorker
 import remy.gui.resources
 from remy.gui.notebookview import *
 
@@ -186,6 +187,12 @@ class InfoPanel(QWidget):
     while self.details.rowCount() > 0:
       self.details.removeRow(0)
 
+  @pyqtSlot(str,QImage)
+  def _onThumb(self, uid, img):
+    self.thumbs[uid] = img
+    if uid == self.entry.uid:
+      self.icon.setPixmap(QPixmap.fromImage(img))
+
   def setEntry(self, entry):
     if not isinstance(entry, Entry):
       entry = self.index.get(entry)
@@ -237,19 +244,27 @@ class InfoPanel(QWidget):
         print(entry)
         self.title.setText("Unknown item")
 
+      if entry.uid in self.thumbs:
+        self.icon.setPixmap(QPixmap.fromImage(self.thumbs[entry.uid]))
+      else:
+        tgen = ThumbnailWorker(self.index, entry.uid)
+        tgen.signals.thumbReady.connect(self._onThumb)
+        QThreadPool.globalInstance().start(tgen)
 
+InfoPanel.thumbs = {}
 
 class PinnedDelegate(QStyledItemDelegate):
 
   def __init__(self, *a, **kw):
     super().__init__(*a, **kw)
-    self._icon = QPixmap(":assets/bookmark.svg")
+    if not hasattr(PinnedDelegate, "_icon"):
+      PinnedDelegate._icon = QPixmap(":assets/bookmark.svg")
 
   def paint(self, painter, style, i):
     QStyledItemDelegate.paint(self, painter, style, QModelIndex())
     if i.data():
       p = style.rect.center()
-      painter.drawPixmap(p.x()-8,p.y()-8, self._icon)
+      painter.drawPixmap(p.x()-8,p.y()-8, PinnedDelegate._icon)
 
   def sizeHint(self, style, i):
     return QSize(16,24)
@@ -402,7 +417,6 @@ class FileBrowser(QMainWindow):
 
     splitter = self.splitter = QSplitter()
     splitter.setHandleWidth(0)
-    self.setCentralWidget(splitter)
 
     tree = self.tree = DocTree(index, splitter)
     info = self.info = InfoPanel(index, splitter)
@@ -432,9 +446,10 @@ class FileBrowser(QMainWindow):
     fg.moveCenter(dg.center())
     self.move(fg.topLeft())
 
-    splitter.setStretchFactor(0,2)
-    splitter.setStretchFactor(1,1)
+    splitter.setStretchFactor(0,3)
+    splitter.setStretchFactor(1,2)
 
+    self.setCentralWidget(splitter)
     # Todo: actions fields, menu per entry type (folder, pdf, nb, epub)
     self.documentMenu = QMenu(self)
     self.folderMenu = QMenu(self)
@@ -469,7 +484,7 @@ class FileBrowser(QMainWindow):
 
   @pyqtSlot(str, list,list)
   def _import(self, p, dirs, files):
-    cont = QApplication.instance().config.get("import",{}).get("default_options",{})
+    cont = QApplication.instance().config.get("import").get("default_options")
     e = self.index.get(p)
     for pdf in files:
       log.info("Uploading %s to %s", pdf, e.visibleName if e else "root")

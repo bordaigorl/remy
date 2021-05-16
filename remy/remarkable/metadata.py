@@ -80,6 +80,12 @@ class Entry:
       updated = self.lastModified or "Unknown"
     return updated
 
+  def cover(self):
+    c = self.get('coverPageNumber', -1, CONTENT)
+    if c < 0:
+      return self.get('lastOpenedPage', 0)
+    return c
+
   def get(self, field, default=None, where=BOTH):
     if field in self._metadata and where & METADATA:
       return self._metadata[field]
@@ -195,10 +201,23 @@ class Document(Entry):
         with open(mfile, 'r') as f:
           layerNames = json.load(f)
         layerNames = layerNames["layers"]
-      except:
+      except Exception:
         layerNames = [{"name": "Layer %d" % j} for j in range(len(layers))]
+
+      highlights = {}
+      try:
+        if self.fsource.exists(self.uid + '.highlights', pid, ext='json'):
+          hfile = self.fsource.retrieve(self.uid + '.highlights', pid, ext='json')
+          with open(hfile, 'r') as f:
+            h = json.load(f).get('highlights', [])
+          for i in range(len(h)):
+            highlights[i] = h[i]
+      except Exception:
+        pass # empty highlights are ok
+
       for j in range(len(layers)):
-        layers[j] = Layer(layers[j], layerNames[j].get("name"))
+        layers[j] = Layer(layers[j], layerNames[j].get("name"), highlights.get(j, []))
+
     return self._makePage(layers, ver, pageNum)
 
   def _makePage(self, layers, version, pageNum):
@@ -331,13 +350,16 @@ class RemarkableIndex:
 
   _listeners = {}
 
-  def __init__(self, fsource):
+  def __init__(self, fsource, progress=(lambda x,tot: None)):
     self.fsource = fsource
     self._uids = list(fsource.listItems())
     index = {ROOT_ID: RootFolder(self)}
 
+    # progress(0, len(self._uids))
+
     for j, uid in enumerate(self._uids):
       print('%d%%' % (j * 100 // len(self._uids)), end='\r',flush=True)
+      progress(j, len(self._uids)*2)
       metadata = self._readJson(uid, ext='metadata')
       content  = self._readJson(uid, ext='content')
       if metadata["type"] == FOLDER_TYPE:
@@ -355,6 +377,7 @@ class RemarkableIndex:
         raise RemarkableDocumentError("Unknown file type '{type}'".format(metadata))
     trash = TrashBin(self)
     for k, prop in index.items():
+      progress(len(self._uids)+j, len(self._uids)*2)
       try:
         if prop.deleted or prop.parent == TRASH_ID:
           trash.append(k)
