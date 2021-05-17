@@ -12,7 +12,7 @@ from PyPDF2.pdf import PageObject
 from PyPDF2.utils import PdfReadError
 from PyPDF2.generic import NullObject
 
-from remy.remarkable.metadata import PDFDoc
+from remy.remarkable.metadata import PDFBasedDoc
 from remy.gui.pagerender import BarePageScene, DEFAULT_COLORS, DEFAULT_HIGHLIGHT
 
 from os import path
@@ -163,7 +163,7 @@ def validatePageRanges(whichPages):
 
 def parsePageRanges(whichPages, document=None):
   if whichPages.strip() == "marked":
-    if isinstance(document, PDFDoc):
+    if isinstance(document, PDFBasedDoc):
       return [slice(i,i+1) for i in document.markedPages()]
     else:
       return [slice(None)]
@@ -225,7 +225,7 @@ class Exporter(QThread):
       scenes = []
       totPages = self.document.pageCount or 0
       pdf = None
-      if isinstance(self.document, PDFDoc) and self.options.get('include_base_layer', True):
+      if isinstance(self.document, PDFBasedDoc) and self.options.get('include_base_layer', True):
         pdf = self.document.retrieveBaseDocument()
         baseReader = PdfFileReader(pdf, strict=False)
         totPages = baseReader.getNumPages()
