@@ -242,7 +242,7 @@ class InfoPanel(QWidget):
       elif isinstance(entry, Notebook):
         self._drops(False)
         self.icon.setPixmap(QPixmap(":assets/128/notebook.svg"))
-      elif isinstance(entry, EPub):
+      elif isinstance(entry, EBook):
         self._drops(False)
         self.icon.setPixmap(QPixmap(":assets/128/epub.svg"))
       else:
@@ -347,8 +347,9 @@ class DocTreeItem(QTreeWidgetItem):
 
   def uploading(self, uid=None, etype=None, metadata=None, path=None, cancel=False):
     self._entry = None
+    self.setFlags(Qt.NoItemFlags)
     self.setFirstColumnSpanned(True)
-    title = metadata.get('visibleName', path.stem)
+    title = metadata.get('visibleName', path.stem if path else 'Untitled')
     doctype = DOCTYPE.get(etype)
     self.uploadingWidget = self.UploadingItem(title, cancel, tree=self.treeWidget())
     if self.treeWidget():
@@ -363,12 +364,6 @@ class DocTreeItem(QTreeWidgetItem):
       return self.uploadingWidget.cancelBtn.clicked
     return None
 
-  @property
-  def dismissed(self):
-    if isinstance(self.uploadingWidget, self.ErrorItem):
-      return self.uploadingWidget.dismissBtn.clicked
-    return None
-
   def setProgress(self, x, tot):
     if self.uploadingWidget:
       self.uploadingWidget.progress.setMaximum(tot)
@@ -376,6 +371,7 @@ class DocTreeItem(QTreeWidgetItem):
 
   def failure(self, uid=None, etype=None, metadata=None, path=None, exception=None):
     self._entry = None
+    self.setFlags(Qt.NoItemFlags)
     self.setFirstColumnSpanned(True)
     title = metadata.get('visibleName', path.stem if path else 'Unnamed')
     doctype = DOCTYPE.get(etype)
@@ -387,6 +383,19 @@ class DocTreeItem(QTreeWidgetItem):
       self.setIcon(0, self.treeWidget()._icon[doctype])
     self._sortdata = doctype[0].upper() + title
 
+  @property
+  def dismissed(self):
+    if isinstance(self.uploadingWidget, self.ErrorItem):
+      return self.uploadingWidget.dismissBtn.clicked
+    return None
+
+  def status(self):
+    if self.uploadingWidget is None and self._entry is not None:
+      return DocTreeItem.OK
+    elif isinstance(self.uploadingWidget, self.UploadingItem):
+      return DocTreeItem.PROGRESS
+    else:
+      return DocTreeItem.ERROR
 
   def setEntry(self, entry):
     if self.treeWidget():
@@ -441,6 +450,9 @@ class DocTreeItem(QTreeWidgetItem):
         pass
     return QTreeWidgetItem.__lt__(self, other)
 
+DocTreeItem.OK = 0
+DocTreeItem.PROGRESS = 1
+DocTreeItem.ERROR = 2
 
 class DocTree(QTreeWidget):
 
@@ -534,7 +546,8 @@ class DocTree(QTreeWidget):
       item = self.itemFromIndex(i)
     else:
       item = self.invisibleRootItem()
-    self.setCurrentItem(item)
+    if len(self.selectedItems()) == 0:
+      self.setCurrentItem(item)
     self.contextMenu.emit(item, event)
 
   _pending_item = {}
@@ -561,21 +574,16 @@ class DocTree(QTreeWidget):
     del self._pending_item[uid]
     i.setEntry(self.index.get(uid))
 
-  @pyqtSlot(str, int, dict, Path, Exception)
-  def newEntryError(self, uid, etype, meta, path, exception):
+  @pyqtSlot(Exception, str, int, dict, Path)
+  def newEntryError(self, exception, uid, etype, meta, path=None):
     log.debug('New entry error: %s', exception)
-    # TODO: if exception is NewEntryCancelled then remove,
-    #       otherwise, show an error message in the item widget
-    i = self._pending_item.get(uid)
-    if i:
-      i.failure(uid, etype, meta, path, exception)
-      def rem():
-        if i.parent():
-          i.parent().removeChild(i)
-        else:
-          self.invisibleRootItem().removeChild(i)
-        del self._pending_item[uid]
-      i.dismissed.connect(rem)
+    if isinstance(exception, NewEntryCancelled):
+      self._removePending(uid)
+    else:
+      i = self._pending_item.get(uid)
+      if i:
+        i.failure(uid, etype, meta, path, exception)
+        i.dismissed.connect(lambda: self._removePending(uid))
 
 
   @pyqtSlot(str, int, dict)
@@ -586,27 +594,177 @@ class DocTree(QTreeWidget):
   def updateEntryComplete(self, uid, etype, new_meta):
     pass
 
-  @pyqtSlot(str, int, dict, Exception)
-  def updateEntryError(self, uid, etype, new_meta, exception):
+  @pyqtSlot(Exception, str, int, dict)
+  def updateEntryError(self, exception, uid, etype, new_meta):
     pass
 
-  # def indexUpdated(self, success, action, entries, index, extra):
-  #   if success:
-  #     if action == index.ADD:
-  #       for uid in entries:
-  #         # we only handle direct descendants of items, more todo
-  #         d = index.get(uid)
-  #         p = self._nodes[d.parent]
-  #         self._nodes[uid] = DocTreeItem(d, p)
-  #     elif action == index.DEL:
-  #       pass
-  #     elif action == index.UPD:
-  #       pass
-  #   else:
-  #     log.error(str(extra['reason']))
-  #     QMessageBox.critical(self, "Error", "Something went wrong:\n\n" % e)
+  def _removePending(self, uid):
+    i = self._pending_item.get(uid)
+    if i:
+      if i.parent():
+        i.parent().removeChild(i)
+      else:
+        self.invisibleRootItem().removeChild(i)
+      del self._pending_item[uid]
+
+  def dismissAllErrors(self, uid):
+    for uid, item in self._pending_item.items():
+      if item.status() == DocTreeItem.ERROR:
+        self._removePending(uid)
+
+  def cancelAllPending(self, uid):
+    for uid, item in self._pending_item.items():
+      if item.status() == DocTreeItem.PROGRESS:
+        op = NewEntryWorker.getWorkerFor(uid)
+        if op:
+          op.cancel()
+
+  def hasPendingItems(self):
+    for item in self._pending_item.values():
+      if item.status() != DocTreeItem.OK:
+        return True
+    return False
+
+# I could have used QWidget.addAction to attach these to the tree/main window
+# but this way I get a bit more flexibility
+class Actions:
+
+  SEPARATOR = None
+
+  def newSep(self):
+    return self.SEPARATOR
+    sep = QAction()
+    sep.setSeparator(True)
+    return sep
+
+  def __init__(self, parent=None, isLive=False):
+    # if all non folders
+    self.preview = QAction('Open in viewer', parent)
+    self.preview.setShortcut("Ctrl+Enter")
+    #
+    # if all non folders (for now)
+    self.export = QAction('Export...', parent)
+    self.export.setShortcut(QKeySequence.Save)
+    self.export.setIcon(QIcon(":assets/16/export.svg"))
+    #
+    # if single folder
+    self.upload = QAction('&Upload Here...', parent)
+    self.upload.setShortcut("Ctrl+U")
+    self.upload.setIcon(QIcon(":assets/16/import.svg"))
+    #
+    # if single non root entry
+    self.rename = QAction('Rename', parent)
+    self.rename.setIcon(QIcon(":assets/16/rename.svg"))
+    # if any unpinned
+    self.addToPinned = QAction('Add to Favourites', parent)
+    self.addToPinned.setIcon(QIcon(":assets/16/bookmark-new.svg"))
+    # if any pinned
+    self.remFromPinned = QAction('Remove from Favourites', parent)
+    self.remFromPinned.setIcon(QIcon(":assets/16/non-starred.svg"))
+    #
+    # if single sel
+    self.newFolder = QAction('New Folder', parent)
+    self.newFolder.setShortcut(QKeySequence.New)
+    self.newFolder.setIcon(QIcon(":assets/16/folder-new.svg"))
+    #
+    # non root
+    self.newFolderWith = QAction('New Folder with Selection', parent)
+    self.newFolderWith.setIcon(QIcon(":assets/16/folder.svg"))
+    #
+    # non root
+    self.delete = QAction('Move to Trash', parent)
+    self.delete.setShortcut(QKeySequence.Delete)
+    self.delete.setIcon(QIcon(":assets/16/trash.svg"))
+    # if pending
+    self.cancelPending = QAction('Cancel all pending', parent)
+    self.cancelPending.setIcon(QIcon(":assets/16/cancel.svg"))
+    self.dismissErrors = QAction('Dismiss all errors', parent)
+    self.dismissErrors.setIcon(QIcon(":assets/16/clear-all.svg"))
+    #
+    self.test = QAction('Test', parent)
+    #
+    self.setLive(isLive)
+    self.enableAccordingToSelection([])
+
+  def isLive(self):
+    return self._isLive
+
+  def setLive(self, b):
+    self._isLive = b
+    self.upload.setVisible(b)
+    self.rename.setVisible(b)
+    self.addToPinned.setVisible(b)
+    self.remFromPinned.setVisible(b)
+    self.newFolder.setVisible(b)
+    self.newFolderWith.setVisible(b)
+    self.delete.setVisible(b)
+    self.cancelPending.setVisible(b)
+    self.dismissErrors.setVisible(b)
+
+  def enableAccordingToSelection(self, sel, pending=False):
+    allFolders = True
+    anyFolders = anyPinned = anyUnpinned = anyTrash = False
+    empty = len(sel) == 0
+    singleSel = len(sel) == 1
+    for e in sel:
+      allFolders = allFolders and e.isFolder()
+      anyFolders = anyFolders or e.isFolder()
+      anyPinned = anyPinned or (e.pinned == True)
+      anyUnpinned = anyUnpinned or (e.pinned == False)
+      anyTrash = anyTrash or e.isTrash()
+    self.preview.setEnabled(not (empty or anyFolders))
+    # self.export.setEnabled(not (empty or anyFolders)) # once implemented
+    self.export.setEnabled(singleSel and not (anyFolders or anyTrash))
+    self.upload.setEnabled(singleSel and allFolders and not anyTrash)
+    self.rename.setEnabled(singleSel and not anyTrash)
+    self.addToPinned.setEnabled(anyUnpinned and not anyTrash)
+    self.remFromPinned.setEnabled(anyPinned and not anyTrash)
+    self.newFolder.setEnabled(singleSel and not anyTrash)
+    self.newFolderWith.setEnabled(not (empty or anyTrash))
+    self.delete.setEnabled(not (empty or anyTrash))
+    self.cancelPending.setVisible(pending)
+    self.dismissErrors.setVisible(pending)
+    ### making invisible the ones not currently implemented:
+    self.rename.setVisible(False)
+    self.addToPinned.setVisible(False)
+    self.remFromPinned.setVisible(False)
+    self.newFolderWith.setVisible(False)
+    self.delete.setVisible(False)
+    self.cancelPending.setVisible(False)
+    self.dismissErrors.setVisible(False)
 
 
+  def toolBarActions(self):
+    return [
+      self.newFolder,
+      self.newSep(),
+      self.upload,
+      self.export,
+      self.newSep(),
+      self.delete,
+    ]
+
+  def ctxtMenuActions(self):
+    return [
+      self.preview,
+      self.newSep(),
+      self.newFolder,
+      self.newFolderWith,
+      self.newSep(),
+      self.rename,
+      self.addToPinned,
+      self.remFromPinned,
+      self.newSep(),
+      self.delete,
+      self.newSep(),
+      self.upload,
+      self.export,
+      self.newSep(),
+      self.test,
+    ]
+
+  def actionsDict(self):
+    return self.__dict__.copy()
 
 
 class FileBrowser(QMainWindow):
@@ -622,7 +780,7 @@ class FileBrowser(QMainWindow):
     tree = self.tree = DocTree(index, splitter)
     info = self.info = InfoPanel(index, splitter)
     # info.setEntry(index.root())
-    info.uploadRequest.connect(self._import)
+    info.uploadRequest.connect(self._requestUpload)
     splitter.setCollapsible(1,True)
 
     # @pyqtSlot(QModelIndex,QModelIndex)
@@ -639,7 +797,7 @@ class FileBrowser(QMainWindow):
 
     # tree.doubleClicked.connect(self.openEntry)
 
-    self.setWindowTitle("ReMy")
+    self.setWindowTitle("Remy")
     self.show()
     dg = QApplication.desktop().availableGeometry(self)
     self.resize(dg.size() * 0.5)
@@ -651,44 +809,45 @@ class FileBrowser(QMainWindow):
     splitter.setStretchFactor(1,2)
 
     self.setCentralWidget(splitter)
-    # Todo: actions fields, menu per entry type (folder, pdf, nb, epub)
-    self.documentMenu = QMenu(self)
-    self.folderMenu = QMenu(self)
-    ###
-    self.previewAction = QAction('Preview', self.tree)
-    self.previewAction.setShortcut("Enter")
-    self.previewAction.triggered.connect(self.openCurrentEntry)
-    #
-    self.exportAction = QAction('Export...', self.tree)
-    self.exportAction.setShortcut(QKeySequence.Save)
-    self.exportAction.triggered.connect(self.exportCurrentEntry)
-    # #
-    # self.deleteAction = QAction('Move to Trash', self.tree)
-    # self.deleteAction.setShortcut(QKeySequence.Delete)
-    # self.deleteAction.triggered.connect(self.deleteEntry)
-    #
-    self.testAction = QAction('Test', self.tree)
-    self.testAction.triggered.connect(self.test)
-    self.folderMenu.addAction(self.testAction)
-    #
-    self.importAction = QAction('&Import...', self.tree)
-    self.importAction.setShortcut("Ctrl+I")
-    self.importAction.triggered.connect(self.importIntoCurrentEntry)
-    ###
-    self.documentMenu.addAction(self.previewAction)
-    # self.documentMenu.addSeparator()
-    self.documentMenu.addAction(self.exportAction)
-    # self.documentMenu.addAction(self.deleteAction)
-    ###
-    if not index.isReadOnly():
-      self.folderMenu.addAction(self.importAction)
+
+    self.actions = Actions(self, isLive=not self.index.isReadOnly())
+    self._connectActions()
+
+    self.setUnifiedTitleAndToolBarOnMac(True)
+    tb = QToolBar("Documents")
+    sep = True
+    for a in self.actions.toolBarActions():
+      if a != Actions.SEPARATOR:
+        tb.addAction(a)
+        sep = tb.isVisible()
+      elif sep:
+        tb.addSeparator()
+        sep = False
+    tb.setIconSize(QSize(16,16))
+    tb.setFloatable(False)
+    tb.setMovable(False)
+    self.addToolBar(tb)
 
     rootitem = self.tree.invisibleRootItem()
     self.tree.setCurrentItem(rootitem)
     self.entrySelected(rootitem,rootitem)
 
+  def _connectActions(self):
+    a = self.actions
+    a.preview.triggered.connect(self.openSelected)
+    a.export.triggered.connect(self.exportSelected)
+    a.newFolder.triggered.connect(self.newFolder)
+    # a.delete.triggered.connect(self.deleteEntry)
+    a.test.triggered.connect(self.test)
+    a.upload.triggered.connect(self.uploadIntoCurrentEntry)
+    self.tree.itemSelectionChanged.connect(self.selectionChanged)
+
+  @pyqtSlot()
+  def selectionChanged(self):
+    self.actions.enableAccordingToSelection([i.entry() for i in self.tree.selectedItems()], self.tree.hasPendingItems())
+
   @pyqtSlot(str, list,list)
-  def _import(self, p, dirs, files):
+  def _requestUpload(self, p, dirs, files):
     cont = QApplication.instance().config.get("import").get("default_options")
     e = self.index.get(p)
     for pdf in files:
@@ -709,13 +868,20 @@ class FileBrowser(QMainWindow):
 
   @pyqtSlot(QTreeWidgetItem,QContextMenuEvent)
   def contextMenu(self, item, event):
-    entry = self.tree.currentEntry()
-    if entry:
-      if isinstance(entry, Folder):
-        if not isinstance(entry, TrashBin):
-          self.folderMenu.popup(self.tree.mapToGlobal(event.pos()))
-      else:
-        self.documentMenu.popup(self.tree.mapToGlobal(event.pos()))
+    items = self.tree.selectedItems()
+    actions = self.actions
+    # actions.enableAccordingToSelection(sel, pending)
+    menu = QMenu(self)
+    sep = True
+    for a in actions.ctxtMenuActions():
+      if a != Actions.SEPARATOR:
+        if a.isEnabled():
+          menu.addAction(a)
+          sep = True
+      elif sep:
+        menu.addSeparator()
+        sep = False
+    menu.popup(self.tree.mapToGlobal(event.pos()))
 
   @pyqtSlot()
   def test(self):
@@ -726,9 +892,10 @@ class FileBrowser(QMainWindow):
 
 
   @pyqtSlot()
-  def openCurrentEntry(self):
-    item = self.tree.currentItem()
-    self.openEntry(item, 0)
+  def openSelected(self):
+    # item = self.tree.currentItem()
+    for item in self.tree.selectedItems():
+      self.openEntry(item)
 
   @pyqtSlot(QTreeWidgetItem,int)
   def openEntry(self, item, col=0):
@@ -744,24 +911,43 @@ class FileBrowser(QMainWindow):
         win.activateWindow()
 
   @pyqtSlot()
-  def exportCurrentEntry(self):
+  def exportSelected(self):
+    # for now, later use selectedItems
     entry = self.tree.currentEntry()
     if entry:
       exportDocument(entry, self)
 
   @pyqtSlot()
-  def importIntoCurrentEntry(self):
+  def uploadIntoCurrentEntry(self):
     entry = self.tree.currentEntry()
     if entry and not entry.index.isReadOnly():
       filenames, ok = QFileDialog.getOpenFileNames(self, "Select files to import")
       if ok and filenames:
-        self._import(entry.uid, [], filenames)
+        self._requestUpload(entry.uid, [], filenames)
+
+  @pyqtSlot()
+  def newFolder(self):
+    entry = self.tree.currentEntry()
+    if entry and not entry.index.isReadOnly():
+      if not entry.isFolder():
+        entry = entry.parentEntry()
+      name, ok = QInputDialog.getText(self, "New Folder in %s" % entry.name(),
+                                      "Name of new folder:", text="New Folder")
+      if ok and name:
+        op = NewFolderWorker(self.index, metadata={'parent': entry.uid, 'visibleName': name})
+        QThreadPool.globalInstance().start(op)
+
+  # @pyqtSlot()
+  # def deleteSelected(self):
+  #   pass
 
 
 
 class NewEntryCancelled(Exception):
   pass
 
+# clearly this would be better as a sort of factory
+# with _pending indexed by fsource but this is good enough for now
 class NewEntryWorker(QRunnable):
 
   def __init__(self, index, **args):
@@ -793,6 +979,20 @@ class NewEntryWorker(QRunnable):
   @classmethod
   def getWorkerFor(cls, uid, default=None):
     return cls._pending.get(uid, default)
+
+  @classmethod
+  def pendingUids(cls):
+    return cls._pending.keys()
+
+  @classmethod
+  def noPending(cls):
+    return len(cls._pending) == 0
+
+  @classmethod
+  def cancelAll(cls):
+    for op in cls._pending.values():
+      op.cancel()
+
 
 NewEntryWorker._pending = {}
 

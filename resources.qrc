@@ -1,5 +1,18 @@
 <!DOCTYPE RCC><RCC version="1.0">
 <qresource>
+    <file>assets/16/bookmark-new.svg</file>
+    <file>assets/16/epub.svg</file>
+    <file>assets/16/export.svg</file>
+    <file>assets/16/folder-new.svg</file>
+    <file>assets/16/folder.svg</file>
+    <file>assets/16/import.svg</file>
+    <file>assets/16/cancel.svg</file>
+    <file>assets/16/clear-all.svg</file>
+    <file>assets/16/non-starred.svg</file>
+    <file>assets/16/notebook.svg</file>
+    <file>assets/16/pdf.svg</file>
+    <file>assets/16/rename.svg</file>
+    <file>assets/16/trash.svg</file>
     <file>assets/24/trash.svg</file>
     <file>assets/24/folder.svg</file>
     <file>assets/24/notebook.svg</file>

@@ -82,6 +82,15 @@ class Entry:
   def isDeleted(self):
     return self.index.isDeleted(self.uid)
 
+  def isFolder(self):
+    return self.index.isFolder(self.uid)
+
+  def isTrash(self):
+    return self.index.isTrash(self.uid)
+
+  def parentEntry(self):
+    return self.index.get(self.parent)
+
   def updatedOn(self):
     try:
       updated = arrow.get(int(self.lastModified)/1000).humanize()
@@ -439,7 +448,7 @@ class RemarkableIndex:
   def _new_entry_progress(self, uid, done, tot):
     pass # for subclasses to specialise
 
-  def _new_entry_error(self, uid, etype, meta, path=None, exception=None):
+  def _new_entry_error(self, exception, uid, etype, meta, path=None):
     pass # for subclasses to specialise
 
   def _new_entry_complete(self, uid, etype, meta, path=None):
@@ -451,7 +460,7 @@ class RemarkableIndex:
   def _update_entry_complete(self, uid, etype, new_meta):
     pass # for subclasses to specialise
 
-  def _update_entry_error(self, uid, etype, new_meta, exception=None):
+  def _update_entry_error(self, exception, uid, etype, new_meta):
     pass # for subclasses to specialise
 
 
@@ -615,6 +624,9 @@ class RemarkableIndex:
   def isFolder(self, uid):
     return uid==ROOT_ID or (uid in self.index and self.index[uid].type == FOLDER_TYPE)
 
+  def isTrash(self, uid):
+    return uid==TRASH_ID
+
   def updatedOn(self, uid):
     try:
       updated = arrow.get(int(self.lastModifiedOf(uid))/1000).humanize()
@@ -690,6 +702,8 @@ class RemarkableIndex:
 
       if not uid:
         uid = self.reserveUid()
+
+      log.info("Preparing creation of %s", uid)
       self._new_entry_prepare(uid, FOLDER, metadata)
 
       def p(x):
@@ -700,7 +714,7 @@ class RemarkableIndex:
       if self.fsource.exists(uid, ext="metadata"):
         raise RemarkableUidCollision("Attempting to create new document but chosen uuid is in use")
 
-      p(0, 2)
+      p(0)
 
       meta = FOLDER_METADATA.copy()
       meta.setdefault('visibleName', 'New Folder')
@@ -710,16 +724,21 @@ class RemarkableIndex:
         raise RemarkableError("Cannot find parent %s" % meta["parent"])
 
       self.fsource.store(meta, uid + '.metadata')
-      p(1, 2)
+      p(1)
       self.fsource.store({}, uid + '.content')
-      p(2, 2)
+      p(2)
+
+      self.index[uid] = d = Folder(self, uid, meta, {})
+      self.index[d.parent].files.append(uid)
+      self._reservedUids.pop(uid, None)
+
       self._new_entry_complete(uid, FOLDER, metadata)
       return uid
     except Exception as e:
       # cleanup if partial upload
       self.fsource.remove(uid + '.metadata')
       self.fsource.remove(uid + '.content')
-      self._new_entry_error(uid, FOLDER, metadata, e)
+      self._new_entry_error(e, uid, FOLDER, metadata)
       raise e
 
 
@@ -733,8 +752,7 @@ class RemarkableIndex:
         uid = self.reserveUid()
       pdf = Path(pdf)
 
-      log.debug("U %s %s", pdf, uid)
-
+      log.info("Preparing creation of %s", uid)
       self._new_entry_prepare(uid, PDF, metadata, pdf)
 
       totBytes = 0
@@ -764,28 +782,21 @@ class RemarkableIndex:
       # imaginary 100bytes per json file
       totBytes = 400 + stat(pdf).st_size
 
-      log.debug("U Start %s", pdf)
-
       p(0)
       self.fsource.store(meta, uid + '.metadata')
-      log.debug("U meta %s", pdf)
       p(200)
       self.fsource.store(cont, uid + '.content')
-      log.debug("U cont %s", pdf)
       p(300)
       self.fsource.store('', uid + '.pagedata')
-      log.debug("U pd %s", pdf)
       p(400)
       self.fsource.upload(pdf, uid + '.pdf', progress=up)
-      log.debug("U upl %s", pdf)
       self.fsource.makeDir(uid)
-      log.debug("U dir %s", pdf)
 
       self.index[uid] = d = PDFDoc(self, uid, meta, cont)
       self.index[d.parent].files.append(uid)
+      self._reservedUids.pop(uid, None)
 
       p(totBytes)
-      log.debug("U done %s", pdf)
       self._new_entry_complete(uid, PDF, metadata, pdf)
 
       return uid
@@ -797,5 +808,5 @@ class RemarkableIndex:
       self.fsource.remove(uid + '.content')
       self.fsource.remove(uid + '.pagedata')
       self.fsource.removeDir(uid)
-      self._new_entry_error(uid, PDF, metadata, pdf, e)
+      self._new_entry_error(e, uid, PDF, metadata, pdf)
       raise e

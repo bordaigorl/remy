@@ -44,6 +44,7 @@ class RemyApp(QApplication):
     self.setApplicationName('remy')
     self.setApplicationDisplayName('Remy')
     self.setWindowIcon(QIcon(':/assets/remy.svg'))
+    self.setAttribute(Qt.AA_DontShowIconsInMenus, True)
 
     self._makeAppPaths()
     config = self.config = RemyConfig(argv=sys.argv, paths=self.paths)

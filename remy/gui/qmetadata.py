@@ -11,13 +11,13 @@ from time import sleep
 
 
 class QRemarkableIndexSignals(QObject):
-  newEntryPrepare     = pyqtSignal(str, int, dict, Path)
+  newEntryPrepare     = pyqtSignal(str, int, dict, object)
   newEntryProgress    = pyqtSignal(str, int, int)
-  newEntryComplete    = pyqtSignal(str, int, dict, Path)
-  newEntryError       = pyqtSignal(str, int, dict, Path, Exception)
+  newEntryComplete    = pyqtSignal(str, int, dict, object)
+  newEntryError       = pyqtSignal(Exception, str, int, dict, object)
   updateEntryPrepare  = pyqtSignal(str, int, dict)
   updateEntryComplete = pyqtSignal(str, int, dict)
-  updateEntryError    = pyqtSignal(str, int, dict, Exception)
+  updateEntryError    = pyqtSignal(Exception, str, int, dict)
 
 
 class QRemarkableIndex(RemarkableIndex):
@@ -33,8 +33,8 @@ class QRemarkableIndex(RemarkableIndex):
   def _new_entry_complete(self, uid, etype, meta, path=None):
     self.signals.newEntryComplete.emit(uid, etype, meta, path)
 
-  def _new_entry_error(self, uid, etype, meta, path=None, exception=None):
-    self.signals.newEntryError.emit(uid, etype, meta, path, exception)
+  def _new_entry_error(self, exception, uid, etype, meta, path=None):
+    self.signals.newEntryError.emit(exception, uid, etype, meta, path)
 
   def _update_entry_prepare(self, uid, etype, new_meta):
     self.signals.updateEntryPrepare.emit(uid, etype, new_meta)
@@ -42,12 +42,13 @@ class QRemarkableIndex(RemarkableIndex):
   def _update_entry_complete(self, uid, etype, new_meta):
     self.signals.updateEntryComplete.emit(uid, etype, new_meta)
 
-  def _update_entry_error(self, uid, etype, new_meta, exception):
-    self.signals.updateEntryError.emit(uid, etype, new_meta, exception)
+  def _update_entry_error(self, exception, uid, etype, new_meta):
+    self.signals.updateEntryError.emit(exception, uid, etype, new_meta)
 
-
+  _test = 0
   def test(self, pdf, uid=None, metadata={}, content={}, progress=None):
     try:
+      self._test += 1
 
       log.debug("TEST uid=%s", uid)
       if not uid:
@@ -92,6 +93,8 @@ class QRemarkableIndex(RemarkableIndex):
       p(300)
       sleep(.1)
       for i in range(totBytes-300):
+        if self._test % 3 == 1 and i == totBytes // 2:
+          raise Exception("Test error. If everithing works as expected, you should be seeing this message and being able to dismiss it.")
         p(300+i+1)
         sleep(.003)
 
