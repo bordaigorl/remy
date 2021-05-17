@@ -67,12 +67,14 @@ class RemyApp(QApplication):
       config.selectSource(source)
 
     self.aboutToQuit.connect(self.cleanup)
+    self.fsource = None
 
   @pyqtSlot()
   def cleanup(self):
     QThreadPool.globalInstance().waitForDone()
-    self.fsource.cleanup()
-    self.fsource.close()
+    if self.fsource:
+      self.fsource.cleanup()
+      self.fsource.close()
 
 
   def sourceSelectionBox(self):
@@ -106,6 +108,7 @@ class RemyApp(QApplication):
   _init = None
   initDialog = None
   def requestInit(self, **overrides):
+    self.fsource = None
     self.setQuitOnLastWindowClosed(False)
     self.initDialog = RemyProgressDialog(label="Loading: ")
     init = RemyInitWorker(*self.config.connectionArgs(**overrides))
@@ -339,6 +342,9 @@ class RemyInitWorker(QRunnable):
       log.info('LOAD TIME: %f', time.perf_counter() - T0)
       self.signals.success.emit(index)
     except RemyInitCancel:
+      if fsource:
+        fsource.cleanup()
+        fsource.close()
       self.signals.canceled.emit()
     except Exception as e:
       self.signals.error.emit(e)
