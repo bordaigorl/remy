@@ -208,7 +208,7 @@ class LiveFileSourceSSH(FileSource):
 
     self.sftp = ssh.open_sftp()
     self.scp = self.sftp
-    self.sftp.lock = RLock()
+    self._lock = RLock()
     # self.scp = SCPClient(ssh.get_transport())
 
     self.templates = {}
@@ -260,24 +260,22 @@ class LiveFileSourceSSH(FileSource):
     if ext:
       filename = filename[:-1] + (filename[-1] + '.' + ext,)
     cachep = self._local(*filename)
-    d = path.dirname(cachep)
-    if not path.isdir(d):
-      os.makedirs(d)
-    if force or not path.isfile(cachep):
-      remp = self._remote(*filename)
-      if filename[-1].endswith('pdf'):
-        log.info('RETR %s %s',cachep,remp)
-      with self.sftp.lock:
+    with self._lock:
+      d = path.dirname(cachep)
+      if not path.isdir(d):
+        os.makedirs(d)
+      if force or not path.isfile(cachep):
+        remp = self._remote(*filename)
         self.scp.get(remp, cachep)
     return cachep
 
   def retrieveTemplate(self, name, progress=None, force=False, preferVector=False):
     try:
       filename = self._selectTemplate(name, preferVector)
-      cachep = self._local(filename, branch=TEMPLDIR)
-      if force or not path.isfile(cachep):
-        remp = self._remote(filename, branch=TEMPLDIR)
-      with self.sftp.lock:
+      with self._lock:
+        cachep = self._local(filename, branch=TEMPLDIR)
+        if force or not path.isfile(cachep):
+          remp = self._remote(filename, branch=TEMPLDIR)
           self.scp.get(remp, cachep)
       return cachep
     except Exception:
@@ -293,7 +291,7 @@ class LiveFileSourceSSH(FileSource):
     #       self.scp.get(self._remote(uid + '.pagedata'), self._local())
 
   def prefetchDocument(self, uid, progress=None, force=False):
-    with self.sftp.lock:
+    with self._lock:
       # self.scp.get(self._remote(uid), self._local(uid), recursive=True)
       if self._isfile(self._remote(uid + '.pdf')):
         self.scp.get(self._remote(uid + '.pdf'), self._local(uid))
@@ -303,7 +301,8 @@ class LiveFileSourceSSH(FileSource):
   def exists(self, *filename, ext=None):
     if ext:
       filename = filename[:-1] + (filename[-1] + '.' + ext,)
-    return self._isfile(self._remote(*filename))
+    with self._lock:
+      return self._isfile(self._remote(*filename))
 
   def cleanup(self):
     shutil.rmtree(self.cache_dir, ignore_errors=True)
@@ -313,9 +312,9 @@ class LiveFileSourceSSH(FileSource):
         self._dirty = False
 
   def listItems(self):
-    if self._allUids is None:
-      self._allUids = []
-      with self.sftp.lock:
+    with self._lock:
+      if self._allUids is None:
+        self._allUids = []
         for entry in self.sftp.listdir(self._remote()):
           name = path.splitext(entry)
           if name[1] == ".metadata":
@@ -326,16 +325,18 @@ class LiveFileSourceSSH(FileSource):
     folder = self._remote(uid)
     ext = '.' + ext
     try:
-      with self.sftp.lock:
+      items = []
+      with self._lock:
         for entry in self.sftp.listdir(folder):
           name = path.splitext(entry)
           if name[1] == ext:
-            yield name[0]
+            items.append(name[0])
+      return items
     except Exception as e:
       return
 
   def upload(self, local, *remote, progress=None, overwrite=False):
-    with self.sftp.lock:
+    with self._lock:
       if overwrite or not self._isfile(self._remote(*remote)):
         self.sftp.put(local, self._remote(*remote), callback=progress)
         self._dirty = True
@@ -343,7 +344,7 @@ class LiveFileSourceSSH(FileSource):
     return False
 
   def store(self, content, *remote, progress=None, overwrite=False):
-    with self.sftp.lock:
+    with self._lock:
       if overwrite or not self._isfile(self._remote(*remote)):
         with self.sftp.open(self._remote(*remote), 'w') as f:
           if type(content) is str:
@@ -363,13 +364,14 @@ class LiveFileSourceSSH(FileSource):
 
   def removeDir(self, *remote, progress=None):
     p = self._remote(*remote)
-    if self._isdir(p):
-      self.sftp.rmdir(p)
+    with self._lock:
+      if self._isdir(p):
+        self.sftp.rmdir(p)
 
 
   def makeDir(self, *remote):
     try:
-      with self.sftp.lock:
+      with self._lock:
         self.sftp.mkdir(self._remote(*remote))
       self._dirty = True
       return True
@@ -470,11 +472,12 @@ class LiveFileSourceRsync(LiveFileSourceSSH):
     if ext:
       filename = filename[:-1] + (filename[-1] + '.' + ext,)
     local = self._local(*filename)
-    if not (path.isfile(local) and local in self._updated):
-      if not self._isfile(self._remote(*filename)):
-        return None
-      self._file_download(self._remote(*filename), local)
-      self._updated[local] = True
+    with self._lock:
+      if not (path.isfile(local) and local in self._updated):
+        if not self._isfile(self._remote(*filename)):
+          return None
+        self._file_download(self._remote(*filename), local)
+        self._updated[local] = True
     return local
 
   def retrieveTemplate(self, name, progress=None, force=False, preferVector=False):
@@ -504,12 +507,13 @@ class LiveFileSourceRsync(LiveFileSourceSSH):
           self._updated[entry.path] = True
 
   def prefetchDocument(self, uid, progress=None, force=False):
-    self._bulk_download(self._remote(uid), self._local(uid), excludes=[], progress=progress)
-    self._bulk_download(self._remote(uid + '.highlights'), self._local(uid), excludes=[], progress=progress)
-    with os.scandir(self._local(uid)) as entries:
-      for entry in entries:
-        if entry.is_file():
-          self._updated[entry.path] = True
+    with self._lock:
+      self._bulk_download(self._remote(uid), self._local(uid), excludes=[], progress=progress)
+      self._bulk_download(self._remote(uid + '.highlights'), self._local(uid), excludes=[], progress=progress)
+      with os.scandir(self._local(uid)) as entries:
+        for entry in entries:
+          if entry.is_file():
+            self._updated[entry.path] = True
 
   def cleanup(self):
     log.debug("CLEANUP: %s", self._dirty)

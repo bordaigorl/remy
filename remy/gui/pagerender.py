@@ -405,22 +405,24 @@ class ThumbnailWorker(QRunnable):
         if bgf:
           bg = QImage(bgf)
           painter.drawImage(img.rect(), bg)
-      elif d.baseDocument():
+      else:
         pdf = d.baseDocument()
-        pdf = pdf.page(d.cover())
-        sz = pdf.pageSize()
-        w, h = sz.width(), sz.height()
-        if w <= h:
-          ratio = min(WIDTH / w, HEIGHT / h)
-        else:
-          ratio = min(HEIGHT / w, WIDTH / h)
-        xres = 5.0 * ratio
-        yres = 5.0 * ratio
-        if w <= h:
-          pdf = pdf.renderToImage(xres, yres)
-        else:
-          pdf = pdf.renderToImage(xres, yres, -1,-1,-1,-1, pdf.Rotate270)
-        painter.drawImage(img.rect(), pdf)
+        if pdf:
+          with pdf.lock:
+            pdf = pdf.page(d.cover())
+            sz = pdf.pageSize()
+            w, h = sz.width(), sz.height()
+            if w <= h:
+              ratio = min(WIDTH / w, HEIGHT / h)
+            else:
+              ratio = min(HEIGHT / w, WIDTH / h)
+            xres = 5.0 * ratio
+            yres = 5.0 * ratio
+            if w <= h:
+              pdf = pdf.renderToImage(xres, yres)
+            else:
+              pdf = pdf.renderToImage(xres, yres, -1,-1,-1,-1, pdf.Rotate270)
+            painter.drawImage(img.rect(), pdf)
       s.render(painter)
       pen = QPen(Qt.gray)
       pen.setWidth(2)

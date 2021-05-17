@@ -11,6 +11,8 @@ from pathlib import Path
 from remy.remarkable.lines import *
 from remy.remarkable.constants import *
 
+from threading import RLock
+
 import logging
 log = logging.getLogger('remy')
 
@@ -234,9 +236,6 @@ class Document(Entry):
     self.fsource.prefetchDocument(self.uid, progress=progress)
 
   def retrieveBaseDocument(self):
-    b = self.baseDocumentName()
-    if b and self.fsource.exists(b):
-      return self.fsource.retrieve(b)
     return None
 
   def baseDocument(self):
@@ -283,6 +282,7 @@ class Notebook(Document):
 class PDFBasedDoc(Document):
 
   _pdf = None
+  _pdf_lock = RLock()
 
   def _makePage(self, layers, version, pageNum):
     return Page(layers, version, pageNum, document=self)
@@ -292,20 +292,28 @@ class PDFBasedDoc(Document):
       if self.fsource.exists(self.uid, p, ext='rm'):
         yield i
 
+  def retrieveBaseDocument(self):
+    b = self.baseDocumentName()
+    if b and self.fsource.exists(b):
+      return self.fsource.retrieve(b)
+    return None
+
   def baseDocument(self):
     from popplerqt5 import Poppler
-    if self._pdf is None:
-      doc = self.retrieveBaseDocument()
-      if doc is None:
-        log.warning("Base document for %s could not be found", self.uid)
-        return None
-      self._pdf = Poppler.Document.load(doc)
-      self._pdf.setRenderHint(Poppler.Document.Antialiasing)
-      self._pdf.setRenderHint(Poppler.Document.TextAntialiasing)
-      try:
-        self._pdf.setRenderHint(Poppler.Document.HideAnnotations)
-      except Exception:
-        pass
+    with self._pdf_lock:
+      if self._pdf is None:
+        doc = self.retrieveBaseDocument()
+        if doc is None:
+          log.warning("Base document for %s could not be found", self.uid)
+          return None
+        self._pdf = Poppler.Document.load(doc)
+        self._pdf.lock = RLock()
+        self._pdf.setRenderHint(Poppler.Document.Antialiasing)
+        self._pdf.setRenderHint(Poppler.Document.TextAntialiasing)
+        try:
+          self._pdf.setRenderHint(Poppler.Document.HideAnnotations)
+        except Exception:
+          pass
     return self._pdf
 
   def baseDocumentName(self):
