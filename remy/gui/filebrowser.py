@@ -396,10 +396,11 @@ class DocTreeItem(QTreeWidgetItem):
     self._entry = entry
     icon = self.treeWidget()._icon
     flags = Qt.ItemIsEnabled | Qt.ItemIsSelectable
+    # commented flag settings should be uncommented once move/rename are implemented
     if isinstance(entry, Document):
-      flags |= Qt.ItemNeverHasChildren | Qt.ItemIsDragEnabled
-      if not entry.index.isReadOnly() and not entry.isDeleted():
-        flags |= Qt.ItemIsEditable
+      flags |= Qt.ItemNeverHasChildren #| Qt.ItemIsDragEnabled
+      # if not entry.index.isReadOnly() and not entry.isDeleted():
+      #   flags |= Qt.ItemIsEditable
       self.setText(0, entry.visibleName)
       if isinstance(entry, Notebook):
         self.setIcon(0, icon['notebook'])
@@ -413,15 +414,15 @@ class DocTreeItem(QTreeWidgetItem):
       self.setText(1, entry.updatedOn())
       self.setText(2, "1" if entry.pinned else "")
     elif isinstance(entry, TrashBin):
-      flags |= Qt.ItemIsDropEnabled
+      # flags |= Qt.ItemIsDropEnabled
       self.setText(0, entry.visibleName)
       self.setIcon(0, icon['trash'])
       self.setText(3, "Trash Bin")
       self.setText(2, "")
     else:
-      flags |= Qt.ItemIsDropEnabled | Qt.ItemIsDragEnabled
-      if not entry.index.isReadOnly() and not entry.isDeleted():
-        flags |= Qt.ItemIsEditable
+      # flags |= Qt.ItemIsDropEnabled | Qt.ItemIsDragEnabled
+      # if not entry.index.isReadOnly() and not entry.isDeleted():
+      #   flags |= Qt.ItemIsEditable
       self.setText(0, entry.visibleName)
       self.setIcon(0, icon['folder'])
       self.setText(3, "Folder")
