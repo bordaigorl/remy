@@ -32,6 +32,8 @@ class NotebookViewer(QGraphicsView):
     # self.setRenderHint(QPainter.SmoothPixmapTransform)
     # setting this^ per-pixmap now, so pencil textures are not smoothened
 
+    self.viewport().grabGesture(Qt.PinchGesture)
+
     self.document = document
     self.options = QApplication.instance().config.preview
     # document.prefetch()
@@ -229,6 +231,15 @@ class NotebookViewer(QGraphicsView):
 
   def resizeEvent(self, event):
     self.updateViewer()
+
+  def viewportEvent(self, event):
+    if event.type() == QEvent.Gesture:
+      pinch = event.gesture(Qt.PinchGesture)
+      if pinch is not None:
+        self._fit = False
+        self.scale(pinch.scaleFactor(), pinch.scaleFactor())
+        return True
+    return bool(QGraphicsView.viewportEvent(self, event))
 
   def mouseDoubleClickEvent(self, event):
     # scenePos = self.mapToScene(event.pos())
