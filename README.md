@@ -262,8 +262,9 @@ by using the `settings` key, for example you could have a per-source default exp
 
 ## Credits
 
-- Icons adapted from designs by Freepik, xnimrodx from www.flaticon.com
-- <a href="https://icons8.com/icon/tj2i6baf72s0/pencil">Pencil icon by Icons8</a>
+- Some icons from [ElementaryOs](https://github.com/elementary/icons)
+- Some icons adapted from designs by Freepik, xnimrodx from www.flaticon.com
+- <a href="https://icons8.com/icon/tj2i6baf72s0/pencil">Pencil spinner by Icons8</a>
 
 ## Disclaimer
 

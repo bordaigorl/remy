@@ -794,7 +794,7 @@ class RemarkableIndex:
 
       self.index[uid] = d = PDFDoc(self, uid, meta, cont)
       self.index[d.parent].files.append(uid)
-      self._reservedUids.pop(uid, None)
+      self._reservedUids.discard(uid)
 
       p(totBytes)
       self._new_entry_complete(uid, PDF, metadata, pdf)
