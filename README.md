@@ -1,6 +1,6 @@
-# reMy, a reMarkable tablet manager app
+# Remy, a reMarkable tablet manager app
 
-The goal of reMy is to allow simple interaction with the reMarkable tablet over ssh, without needing the cloud service, nor the USB Web UI.
+The goal of Remy is to allow simple interaction with the reMarkable tablet over ssh, without needing the cloud service, nor the USB Web UI.
 
 
 **BEWARE**
@@ -10,7 +10,7 @@ It has not been thoroughly tested.
 These instructions are preliminary and will be expanded with time.
 Feel free to populate the wiki!
 
-I did my best to make sure usage of reMy will not incur in data loss.
+I did my best to make sure usage of Remy will not incur in data loss.
 Most of the features exclusively read from the tablet and are completely safe, even if they may fail on the computer side.
 The only features that alters data on the tablet is the upload feature.
 It is however very unlikely to cause any problem since it only adds files.
@@ -81,7 +81,7 @@ The file `example_config.json` is an example configuration that you can adapt to
 ### Source types
 Each source defines a possible way to get the contents to display.
 The `default_source` settings indicates which source to load if none is specified in the command line.
-If `default_source` is `false` or not set, then reMy shows a dialog allowing you to pick a source among the available ones.
+If `default_source` is `false` or not set, then Remy shows a dialog allowing you to pick a source among the available ones.
 There are three supported kinds of sources: `local`, `ssh` and `rsync`.
 
 #### Local source
@@ -143,7 +143,7 @@ It is possible to specify `remote_documents` and `remote_templates`, these paths
 
 This is an optimised version of the SSH source.
 While SSH works without extra dependencies, the rsync source requires `rsync` to be installed on the reMarkable.
-A mandatory setting is `data_dir` which should point to a directory which can be managed by reMy to keep a partial copy of the tablet's data.
+A mandatory setting is `data_dir` which should point to a directory which can be managed by Remy to keep a partial copy of the tablet's data.
 Every time you connect, only the changes are downloaded.
 The data-heavy files (PDFs and .rm) are downloaded on demand.
 The optional settings `rsync_path` provides the path to the local rsync binary and `rsync_options` provides additional options, the example above configures the options to find the rsync binary on the remarkable installed using entware.
@@ -151,11 +151,11 @@ The optional settings `rsync_path` provides the path to the local rsync binary a
 
 #### The `use_banner` option
 
-When this option is set, the main UI of the tabled will be temporarily disabled while reMy is open.
+When this option is set, the main UI of the tabled will be temporarily disabled while Remy is open.
 This is intended as an helpful prompt and a way to avoid conflicts on data access.
 The feature works best if the setting is the filename (can be absolute, or relative to home) of a png file stored on the tablet (there's a nice `remy-banner.png` in the asset folders you can upload with `scp`) and [`remarkable-splash`](https://github.com/ddvk/remarkable-splash) is installed on the tablet.
 
-If reMy crashes and the remarkable seems unresponsive it is only because reMy re-enables the main UI of the tabled on exit; to regain control of the tablet you have three options: try and run reMy again and close it cleanly; or run `ssh REMARKABLEHOST /bin/systemctl start xochitl`; or manually reboot the device. Don't worry nothing bad is happening to the tablet in this circumstance.
+If Remy crashes and the remarkable seems unresponsive it is only because Remy re-enables the main UI of the tabled on exit; to regain control of the tablet you have three options: try and run Remy again and close it cleanly; or run `ssh REMARKABLEHOST /bin/systemctl start xochitl`; or manually reboot the device. Don't worry nothing bad is happening to the tablet in this circumstance.
 
 ### Preview options
 
@@ -199,7 +199,7 @@ Only one page at a time can be exported (via context menu in preview) and the da
 
 ## Features
 
-Once the configuration file contains the necessary info, you can run reMy by running
+Once the configuration file contains the necessary info, you can run Remy by running
 
     python remygui.py [SOURCE]
 
