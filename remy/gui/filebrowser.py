@@ -184,7 +184,7 @@ class InfoPanel(QWidget):
   def _drops(self, enabled, folders=True, action='import'):
     if self.drop:
       if enabled:
-        self.drop.accepting([".pdf"], folders, action)
+        self.drop.accepting([".pdf", ".epub"], folders, action)
       else:
         self.drop.accepting()
 
@@ -238,6 +238,7 @@ class InfoPanel(QWidget):
       self.title.setText(entry.visibleName)
       if isinstance(entry, PDFDoc):
         # self._drops(True, False, 'replace')
+        self._drops(False)
         self.icon.setPixmap(QPixmap(":assets/128/pdf.svg"))
       elif isinstance(entry, Notebook):
         self._drops(False)
@@ -848,11 +849,12 @@ class FileBrowser(QMainWindow):
 
   @pyqtSlot(str, list,list)
   def _requestUpload(self, p, dirs, files):
-    cont = QApplication.instance().config.get("import").get("default_options")
+    opt = QApplication.instance().config.get("upload")
     e = self.index.get(p)
-    for pdf in files:
-      log.info("Uploading %s to %s", pdf, e.visibleName if e else "root")
-      op = UploadWorker(self.index, pdf=pdf, metadata={'parent': p}, content=cont)
+    for doc in files:
+      log.info("Uploading %s to %s", doc, e.visibleName if e else "root")
+      cont = opt.get(str(doc)[-3:].lower() + "_options", {})
+      op = UploadWorker(self.index, path=doc, metadata={'parent': p}, content=cont)
       QThreadPool.globalInstance().start(op)
 
   # @pyqtSlot()
@@ -999,7 +1001,7 @@ NewEntryWorker._pending = {}
 class UploadWorker(NewEntryWorker):
 
   def do(self):
-    self.index.newPDFDoc(uid=self.uid, progress=self._progress, **self._args)
+    self.index.newDocument(uid=self.uid, progress=self._progress, **self._args)
 
 class NewFolderWorker(NewEntryWorker):
 

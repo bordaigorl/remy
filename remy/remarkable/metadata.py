@@ -10,6 +10,8 @@ from pathlib import Path
 
 from remy.remarkable.lines import *
 from remy.remarkable.constants import *
+from remy.utils import deepupdate
+from copy import deepcopy
 
 from threading import RLock
 
@@ -247,6 +249,12 @@ class Document(Entry):
   def retrieveBaseDocument(self):
     return None
 
+  def shouldHaveBaseDocument(self):
+    return False
+
+  def hasBaseDocument(self):
+    return False
+
   def baseDocument(self):
     return None
 
@@ -307,6 +315,13 @@ class PDFBasedDoc(Document):
       return self.fsource.retrieve(b)
     return None
 
+  def shouldHaveBaseDocument(self):
+    return True
+
+  def hasBaseDocument(self):
+    b = self.baseDocumentName()
+    return b and self.fsource.exists(b)
+
   def baseDocument(self):
     from popplerqt5 import Poppler
     with self._pdf_lock:
@@ -342,7 +357,7 @@ class EBook(PDFBasedDoc):
     return self.uid + '.epub'
 
 
-PDF_BASE_METADATA = {
+DOC_BASE_METADATA = {
     "deleted": False,
     "metadatamodified": True,
     "modified": True,
@@ -374,6 +389,31 @@ PDF_BASE_CONTENT  = {
       "m21": 0, "m22": 1, "m23": 0,
       "m31": 0, "m32": 0, "m33": 1
     }
+}
+
+EPUB_BASE_CONTENT = {
+  "dummyDocument": False,
+  "extraMetadata": {},
+  "fileType": "epub",
+  "fontName": "Noto Serif",
+  "legacyEpub": False,
+  "lineHeight": 150,
+  "margins": 200,
+  "orientation": "portrait",
+  "textAlignment": "justify",
+  "textScale": 0.8,
+  "lastOpenedPage": 0,
+  "pageCount": 0,
+  "transform": {
+    "m11": 1, "m12": 0, "m13": 0,
+    "m21": 0, "m22": 1, "m23": 0,
+    "m31": 0, "m32": 0, "m33": 1
+  }
+}
+
+DOC_BASE_CONTENT  = {
+  PDF: PDF_BASE_CONTENT,
+  EPUB: EPUB_BASE_CONTENT,
 }
 
 
@@ -730,7 +770,7 @@ class RemarkableIndex:
 
       self.index[uid] = d = Folder(self, uid, meta, {})
       self.index[d.parent].files.append(uid)
-      self._reservedUids.pop(uid, None)
+      self._reservedUids.discard(uid)
 
       self._new_entry_complete(uid, FOLDER, metadata)
       return uid
@@ -742,7 +782,7 @@ class RemarkableIndex:
       raise e
 
 
-  def newPDFDoc(self, pdf=None, uid=None, metadata={}, content={}, progress=None):
+  def newDocument(self, path=None, uid=None, metadata={}, content={}, progress=None):
     try:
 
       if self.isReadOnly():
@@ -750,10 +790,17 @@ class RemarkableIndex:
 
       if not uid:
         uid = self.reserveUid()
-      pdf = Path(pdf)
+      path = Path(path)
+      ext = path.suffix
+      if ext.lower() == ".pdf":
+        etype = PDF
+      elif ext.lower() == ".epub":
+        etype = EPUB
+      else:
+        raise RemarkableError("Can only upload PDF and EPUB files, but was given a %s" % ext.upper())
 
       log.info("Preparing creation of %s", uid)
-      self._new_entry_prepare(uid, PDF, metadata, pdf)
+      self._new_entry_prepare(uid, etype, metadata, path)
 
       totBytes = 0
       if callable(progress):
@@ -769,18 +816,18 @@ class RemarkableIndex:
       if self.fsource.exists(uid, ext="metadata"):
         raise RemarkableUidCollision("Attempting to create new document but chosen uuid is in use")
 
-      meta = PDF_BASE_METADATA.copy()
-      meta.setdefault('visibleName', pdf.stem)
+      meta = DOC_BASE_METADATA.copy()
+      meta.setdefault('visibleName', path.stem)
       meta.setdefault('lastModified', str(arrow.utcnow().int_timestamp * 1000))
-      meta.update(metadata)
+      deepupdate(meta, metadata)
       if not self.isFolder(meta["parent"]):
         raise RemarkableError("Cannot find parent %s" % meta["parent"])
 
-      cont = PDF_BASE_CONTENT.copy()
-      cont.update(content)
+      cont = deepcopy(DOC_BASE_CONTENT[etype])
+      deepupdate(cont, content)
 
       # imaginary 100bytes per json file
-      totBytes = 400 + stat(pdf).st_size
+      totBytes = 400 + stat(path).st_size
 
       p(0)
       self.fsource.store(meta, uid + '.metadata')
@@ -789,24 +836,27 @@ class RemarkableIndex:
       p(300)
       self.fsource.store('', uid + '.pagedata')
       p(400)
-      self.fsource.upload(pdf, uid + '.pdf', progress=up)
+      self.fsource.upload(path, uid + ext, progress=up)
       self.fsource.makeDir(uid)
 
-      self.index[uid] = d = PDFDoc(self, uid, meta, cont)
+      if etype == PDF:
+        self.index[uid] = d = PDFDoc(self, uid, meta, cont)
+      else:
+        self.index[uid] = d = EBook(self, uid, meta, cont)
       self.index[d.parent].files.append(uid)
       self._reservedUids.discard(uid)
 
       p(totBytes)
-      self._new_entry_complete(uid, PDF, metadata, pdf)
+      self._new_entry_complete(uid, etype, metadata, path)
 
       return uid
 
     except Exception as e:
       # cleanup if partial upload
-      self.fsource.remove(uid + '.pdf')
+      self.fsource.remove(uid + ext)
       self.fsource.remove(uid + '.metadata')
       self.fsource.remove(uid + '.content')
       self.fsource.remove(uid + '.pagedata')
       self.fsource.removeDir(uid)
-      self._new_entry_error(e, uid, PDF, metadata, pdf)
+      self._new_entry_error(e, uid, etype, metadata, path)
       raise e
