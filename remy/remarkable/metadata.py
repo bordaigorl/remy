@@ -84,6 +84,9 @@ class Entry:
   def isDeleted(self):
     return self.index.isDeleted(self.uid)
 
+  def isIndirectlyDeleted(self):
+    return self.index.isIndirectlyDeleted(self.uid)
+
   def isFolder(self):
     return self.index.isFolder(self.uid)
 
@@ -91,7 +94,12 @@ class Entry:
     return self.index.isTrash(self.uid)
 
   def parentEntry(self):
+    if self.parent is None:
+      return None
     return self.index.get(self.parent)
+
+  def ancestry(self):
+    return self.index.ancestryOf(self.uid, exact=True)
 
   def updatedOn(self):
     try:
@@ -194,9 +202,13 @@ class TrashBin(Folder):
     self._postInit()
 
   def append(self, entry):
-    self.files.append(entry)
+    if entry.type == FOLDER_TYPE:
+      self.folders.append(entry.uid)
+    else:
+      self.files.append(entry.uid)
 
   def items(self):
+    yield from self.folders
     yield from self.files
 
 
@@ -463,7 +475,7 @@ class RemarkableIndex:
       progress(len(self._uids)+j, len(self._uids)*2)
       try:
         if prop.deleted or prop.parent == TRASH_ID:
-          trash.append(k)
+          trash.append(prop)
           continue
         parent = prop.parent
         if parent is not None:
@@ -515,15 +527,15 @@ class RemarkableIndex:
       uid = self.matchId(uid)
     if uid in self.index:
       return self.index[uid]
+    elif uid ==TRASH_ID:
+      return self.trash
     else:
       raise RemarkableError("Uid %s not found!" % uid)
 
-  def allUids(self, trashToo=False):
+  def allUids(self):
     yield from self._uids
-    if trashToo:
-      yield from self.trash.items()
 
-  def ancestry(self,uid,exact=True):
+  def ancestryOf(self, uid, exact=True, includeSelf=False, reverse=True):
     if not exact:
       uid = self.matchId(uid)
     p = []
@@ -531,13 +543,18 @@ class RemarkableIndex:
       if uid in self.index:
         p.append(uid)
         uid = self.index[uid].parent
+      elif uid == TRASH_ID:
+        p.append(TRASH_ID)
+        break
       else:
         return None
-    return reversed(p[1:])
+    if not includeSelf: p = p[1:]
+    if reverse: p = reversed(p)
+    return p
 
-  def pathOf(self,uid, exact=True, delim=None):
+  def pathOf(self, uid, exact=True, delim=None):
     p = map(lambda x: self.index[x].visibleName,
-            self.ancestry(uid,exact))
+            self.ancestryOf(uid,exact))
     if delim is None:
       return p
     else:
@@ -626,14 +643,10 @@ class RemarkableIndex:
       t = t >> 4
     return t
 
-  def matchId(self, pid, trashToo=False):
+  def matchId(self, pid):
     for k in self.index:
       if k.startswith(pid):
         return k
-    if trashToo:
-      for k in self.trash.items():
-        if k.startswith(pid):
-          return k
     return None
 
   def pathOf(self, uid, exact=True, trash_too=False):
@@ -641,7 +654,7 @@ class RemarkableIndex:
       uid = self.match_id(uid)
     p = []
     while uid:
-      if uid in self.index and (trash_too or uid not in self.trash.items()):
+      if uid in self.index and (trash_too or not self.isDeleted(uid)):
           p.append(self.index[uid].visibleName)
           uid = self.index[uid].parent
       else:
@@ -659,10 +672,10 @@ class RemarkableIndex:
           yield k
 
   def isFile(self, uid):
-    return uid!=ROOT_ID and (uid in self.index and self.index[uid].type == DOCUMENT_TYPE)
+    return uid!=TRASH_ID and (uid in self.index and self.index[uid].type == DOCUMENT_TYPE)
 
   def isFolder(self, uid):
-    return uid==ROOT_ID or (uid in self.index and self.index[uid].type == FOLDER_TYPE)
+    return uid==TRASH_ID or (uid in self.index and self.index[uid].type == FOLDER_TYPE)
 
   def isTrash(self, uid):
     return uid==TRASH_ID
@@ -679,7 +692,13 @@ class RemarkableIndex:
                 if uid in self.index else None)
 
   def isDeleted(self, uid):
-    return uid in self.trash.items()
+    return uid != TRASH_ID and (self.index[uid].deleted or self.index[uid].parent == TRASH_ID)
+
+  def isIndirectlyDeleted(self, uid):
+    for f in self.ancestryOf(uid, includeSelf=True, reverse=False):
+      if self.isDeleted(f):
+        return True
+    return False
 
   def __getattr__(self, field):
     if field.endswith("Of"):
@@ -692,6 +711,8 @@ class RemarkableIndex:
   def scanFolders(self, uid=ROOT_ID):
       if isinstance(uid, Entry):
         n = uid
+      elif uid == TRASH_ID:
+        n = self.trash
       else:
         n = self.index[uid]
       if isinstance(n, Folder):
@@ -705,6 +726,8 @@ class RemarkableIndex:
   def depthFirst(self, uid=ROOT_ID):
       if isinstance(uid, Entry):
         n = uid
+      elif uid == TRASH_ID:
+        n = self.trash
       else:
         n = self.index[uid]
       if isinstance(n, Folder):

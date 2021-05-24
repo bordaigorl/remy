@@ -512,11 +512,16 @@ class DocTree(QTreeWidget):
         d = index.get(d)
         c = nodes[d.uid] = DocTreeItem(d, p)
     if show_trash:
-      d = index.trash
-      p = nodes[d.uid] = DocTreeItem(d, self)
-      for i in index.trash.files:
-        d = index.get(i)
-        nodes[d.uid] = DocTreeItem(d, p)
+      t = index.trash
+      nodes[t.uid] = DocTreeItem(t, self)
+      for f in index.scanFolders(t):
+        p = nodes[f.uid]
+        for d in f.files:
+          d = index.get(d)
+          c = nodes[d.uid] = DocTreeItem(d, p)
+        for d in f.folders:
+          d = index.get(d)
+          c = nodes[d.uid] = DocTreeItem(d, p)
 
     self.sortItems(0, Qt.AscendingOrder)
     self.resizeColumnToContents(2)
