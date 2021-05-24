@@ -445,6 +445,8 @@ FOLDER_METADATA = {
 
 class RemarkableIndex:
 
+  _upd_lock = RLock()
+
   def __init__(self, fsource, progress=(lambda x,tot: None)):
     self.fsource = fsource
     self._uids = list(fsource.listItems())
@@ -506,13 +508,13 @@ class RemarkableIndex:
   def _new_entry_complete(self, uid, etype, meta, path=None):
     pass # for subclasses to specialise
 
-  def _update_entry_prepare(self, uid, etype, new_meta):
+  def _update_entry_prepare(self, uid, new_meta, new_content):
     pass # for subclasses to specialise
 
-  def _update_entry_complete(self, uid, etype, new_meta):
+  def _update_entry_complete(self, uid, new_meta, new_content):
     pass # for subclasses to specialise
 
-  def _update_entry_error(self, exception, uid, etype, new_meta):
+  def _update_entry_error(self, exception, uid, new_meta, new_content):
     pass # for subclasses to specialise
 
 
@@ -744,10 +746,6 @@ class RemarkableIndex:
       else:
         yield n
 
-  ### Concurrency assumption:
-  ### a client of RemarkableIndex has to ensure that there are
-  ### max 1 writer (readers are unlimited)
-
   _reservedUids = set()
 
   def reserveUid(self):
@@ -758,7 +756,7 @@ class RemarkableIndex:
     self._reservedUids.add(uid)
     return uid
 
-  def newFolder(self, uid=None, metadata={}, progress=None):
+  def newFolder(self, uid=None, progress=None, **metadata):
     try:
       if self.isReadOnly():
         raise RemarkableSourceError("The file source '%s' is read-only" % self.fsource.name)
@@ -805,7 +803,7 @@ class RemarkableIndex:
       raise e
 
 
-  def newDocument(self, path=None, uid=None, metadata={}, content={}, progress=None):
+  def newDocument(self, path=None, uid=None, content={}, progress=None, **metadata):
     try:
 
       if self.isReadOnly():
@@ -863,9 +861,10 @@ class RemarkableIndex:
       self.fsource.makeDir(uid)
 
       if etype == PDF:
-        self.index[uid] = d = PDFDoc(self, uid, meta, cont)
+        d = PDFDoc(self, uid, meta, cont)
       else:
-        self.index[uid] = d = EBook(self, uid, meta, cont)
+        d = EBook(self, uid, meta, cont)
+      self.index[uid] = d
       self.index[d.parent].files.append(uid)
       self._reservedUids.discard(uid)
 
@@ -883,3 +882,70 @@ class RemarkableIndex:
       self.fsource.removeDir(uid)
       self._new_entry_error(e, uid, etype, metadata, path)
       raise e
+
+
+  def update(self, uid, content={}, **metadata):
+    # If you need this to look atomic vs concurrent reads
+    # of metadata modify only one field at a time
+    try:
+      with self._upd_lock:
+        self._update_entry_prepare(uid, metadata, content)
+
+        if uid == ROOT_ID or uid == TRASH_ID:
+          raise RemarkableError("Cannot update root and trash entries")
+
+        entry = self.get(uid)
+
+        if content:
+          cont = deepcopy(entry._content)
+          deepupdate(cont, content)
+          self.fsource.store(cont, uid + '.content', overwrite=True)
+          entry._content = cont
+
+        if metadata or content: # if content changed, bump version
+          new_parent = old_parent = None # flagging no reparenting needed
+          if 'type' in metadata:
+            raise RemarkableError("Cannot change type of document")
+          # Safety checks for move operations
+          if 'parent' in metadata:
+            old_parent = entry.parentEntry()
+            new_parent = self.get(metadata['parent'])
+            if not new_parent.isFolder():
+              raise RemarkableError("Cannot change parent of %s to %s which is not a folder" % (uid, new_parent.uid))
+            if entry.isFolder() and uid in new_parent.ancestry():
+              raise RemarkableError("Circularity would be introduced by making %s a parent of %s" % (new_parent.uid, uid))
+          meta = deepcopy(entry._metadata)
+          metadata.setdefault('lastModified', str(arrow.utcnow().int_timestamp * 1000))
+          metadata.setdefault('metadatamodified', True)
+          metadata.setdefault('version', entry.version+1)
+          deepupdate(meta, metadata)
+          self.fsource.store(meta, uid + '.metadata', overwrite=True)
+
+          entry._metadata = meta
+          if new_parent is not None:
+            if entry.isFolder():
+              old_parent.folders.remove(uid)
+              new_parent.folders.append(uid)
+            else:
+              old_parent.files.remove(uid)
+              new_parent.files.append(uid)
+
+        self._update_entry_complete(uid, metadata, content)
+    except Exception as e:
+      self._update_entry_error(e, uid, metadata, content)
+      raise e
+
+  def moveToTrash(self, uid):
+    with self._upd_lock:
+      if not self.isDeleted(uid):
+        self.update(uid, parent=TRASH_ID)
+
+  def rename(self, uid, new_name):
+    self.update(uid, visibleName=new_name)
+
+  def newFolderWith(self, uids=[], **metadata):
+    with self._upd_lock:
+      fuid = self.newFolder(**metadata)
+      for uid in uids:
+        self.update(uid, parent=fuid)
+

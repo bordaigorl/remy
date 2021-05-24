@@ -15,9 +15,9 @@ class QRemarkableIndexSignals(QObject):
   newEntryProgress    = pyqtSignal(str, int, int)
   newEntryComplete    = pyqtSignal(str, int, dict, object)
   newEntryError       = pyqtSignal(Exception, str, int, dict, object)
-  updateEntryPrepare  = pyqtSignal(str, int, dict)
-  updateEntryComplete = pyqtSignal(str, int, dict)
-  updateEntryError    = pyqtSignal(Exception, str, int, dict)
+  updateEntryPrepare  = pyqtSignal(str, dict, dict)
+  updateEntryComplete = pyqtSignal(str, dict, dict)
+  updateEntryError    = pyqtSignal(Exception, str, dict, dict)
 
 
 class QRemarkableIndex(RemarkableIndex):
@@ -36,17 +36,17 @@ class QRemarkableIndex(RemarkableIndex):
   def _new_entry_error(self, exception, uid, etype, meta, path=None):
     self.signals.newEntryError.emit(exception, uid, etype, meta, path)
 
-  def _update_entry_prepare(self, uid, etype, new_meta):
-    self.signals.updateEntryPrepare.emit(uid, etype, new_meta)
+  def _update_entry_prepare(self, uid, new_meta, new_content):
+    self.signals.updateEntryPrepare.emit(uid, new_meta, new_content)
 
-  def _update_entry_complete(self, uid, etype, new_meta):
-    self.signals.updateEntryComplete.emit(uid, etype, new_meta)
+  def _update_entry_complete(self, uid, new_meta, new_content):
+    self.signals.updateEntryComplete.emit(uid, new_meta, new_content)
 
-  def _update_entry_error(self, exception, uid, etype, new_meta):
-    self.signals.updateEntryError.emit(exception, uid, etype, new_meta)
+  def _update_entry_error(self, exception, uid, new_meta, new_content):
+    self.signals.updateEntryError.emit(exception, uid, new_meta, new_content)
 
   _test = 0
-  def test(self, pdf, uid=None, metadata={}, content={}, progress=None):
+  def test(self, pdf, uid=None, content={}, progress=None, **metadata):
     try:
       self._test += 1
 
