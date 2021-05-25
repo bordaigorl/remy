@@ -265,12 +265,13 @@ class NoEditDelegate(QStyledItemDelegate):
   def createEditor(self, parent, option, index):
     return None
 
+
 class PinnedDelegate(NoEditDelegate):
 
   def __init__(self, *a, **kw):
     super().__init__(*a, **kw)
     if not hasattr(PinnedDelegate, "_icon"):
-      PinnedDelegate._icon = QPixmap(":assets/bookmark.svg")
+      PinnedDelegate._icon = QPixmap(":assets/symbolic/starred.svg")
 
   def paint(self, painter, style, i):
     QStyledItemDelegate.paint(self, painter, style, QModelIndex())
@@ -495,7 +496,6 @@ class DocTree(QTreeWidget):
       "pdf": QIcon(QPixmap(":assets/24/pdf.svg")),
       "epub": QIcon(QPixmap(":assets/24/epub.svg")),
       "notebook": QIcon(QPixmap(":assets/24/notebook.svg")),
-      "pinned": QIcon(QPixmap(":assets/bookmark.svg"))
     }
 
     nodes = self._nodes = {}
@@ -663,10 +663,10 @@ class Actions:
     self.rename.setIcon(QIcon(":assets/16/rename.svg"))
     # if any unpinned
     self.addToPinned = QAction('Add to Favourites', parent)
-    self.addToPinned.setIcon(QIcon(":assets/16/bookmark-new.svg"))
+    self.addToPinned.setIcon(QIcon(":assets/16/star-add.svg"))
     # if any pinned
     self.remFromPinned = QAction('Remove from Favourites', parent)
-    self.remFromPinned.setIcon(QIcon(":assets/16/non-starred.svg"))
+    self.remFromPinned.setIcon(QIcon(":assets/16/star-rem.svg"))
     #
     # if single sel
     self.newFolder = QAction('New Folder', parent)
