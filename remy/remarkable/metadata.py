@@ -449,16 +449,20 @@ class RemarkableIndex:
 
   def __init__(self, fsource, progress=(lambda x,tot: None)):
     self.fsource = fsource
-    self._uids = list(fsource.listItems())
+    uids = list(fsource.listItems())
     index = {ROOT_ID: RootFolder(self)}
 
-    # progress(0, len(self._uids))
+    # progress(0, len(uids))
 
-    for j, uid in enumerate(self._uids):
-      print('%d%%' % (j * 100 // len(self._uids)), end='\r',flush=True)
-      progress(j, len(self._uids)*2)
-      metadata = self._readJson(uid, ext='metadata')
-      content  = self._readJson(uid, ext='content')
+    for j, uid in enumerate(uids):
+      # print('%d%%' % (j * 100 // len(uids)), end='\r',flush=True)
+      progress(j, len(uids)*2)
+      try:
+        metadata = self._readJson(uid, ext='metadata')
+        content  = self._readJson(uid, ext='content')
+      except Exception as e:
+        log.warning("Could not load metadata of %s: skipping [%s]", uid, e)
+        continue
       if metadata["type"] == FOLDER_TYPE:
         index[uid] = Folder(self, uid, metadata, content)
       elif metadata["type"] == DOCUMENT_TYPE:
@@ -474,7 +478,7 @@ class RemarkableIndex:
         raise RemarkableDocumentError("Unknown file type '{type}'".format(metadata))
     trash = TrashBin(self)
     for k, prop in index.items():
-      progress(len(self._uids)+j, len(self._uids)*2)
+      progress(len(uids)+j, len(uids)*2)
       try:
         if prop.deleted or prop.parent == TRASH_ID:
           trash.append(prop)
@@ -535,7 +539,7 @@ class RemarkableIndex:
       raise RemarkableError("Uid %s not found!" % uid)
 
   def allUids(self):
-    yield from self._uids
+    return self.index.keys()
 
   def ancestryOf(self, uid, exact=True, includeSelf=False, reverse=True):
     if not exact:
