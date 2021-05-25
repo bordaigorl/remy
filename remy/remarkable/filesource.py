@@ -405,6 +405,7 @@ class LiveFileSourceRsync(LiveFileSourceSSH):
 
     if rsync_path:
       self.RSYNC = [ rsync_path ]
+    self.RSYNC.append('--info=NAME')
 
     ssh_config = ['-e', '%s -o batchmode=yes' % which("ssh")]
     if key:
