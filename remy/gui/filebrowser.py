@@ -283,6 +283,30 @@ class PinnedDelegate(NoEditDelegate):
     return QSize(16,24)
 
 
+class StatusDelegate(NoEditDelegate):
+
+  def __init__(self, *a, **kw):
+    super().__init__(*a, **kw)
+    if not hasattr(StatusDelegate, "_icon"):
+      StatusDelegate._icon = {
+        '': QPixmap(":assets/symbolic/ok.svg"),
+        'warning': QPixmap(":assets/symbolic/warning.svg"),
+        'error': QPixmap(":assets/symbolic/error.svg"),
+        'info': QPixmap(":assets/symbolic/info.svg"),
+        'updating': QPixmap(":assets/symbolic/updating.svg"),
+      }
+
+  def paint(self, painter, style, i):
+    QStyledItemDelegate.paint(self, painter, style, QModelIndex())
+    icon = StatusDelegate._icon.get(i.data())
+    if icon:
+      p = style.rect.center()
+      painter.drawPixmap(p.x()-8,p.y()-8, icon)
+
+  def sizeHint(self, style, i):
+    return QSize(16,24)
+
+
 DOCTYPE = {
   PDF: 'pdf',
   FOLDER: 'folder',
@@ -342,10 +366,12 @@ class DocTreeItem(QTreeWidgetItem):
 
   def __init__(self, entry=None, parent=None, **kw):
     super().__init__(parent)
+    self._messages = []
     if entry is None:
       self.uploading(**kw)
     else:
       self.setEntry(entry)
+      self.idle()
 
   def uploading(self, uid=None, etype=None, metadata=None, path=None, cancel=False):
     self._entry = None
@@ -370,6 +396,39 @@ class DocTreeItem(QTreeWidgetItem):
     if self.uploadingWidget:
       self.uploadingWidget.progress.setMaximum(tot)
       self.uploadingWidget.progress.setValue(x)
+
+  def warning(self, msg):
+    self._messages.append(('warning', msg))
+    self.idle()
+
+  def error(self, msg):
+    self._messages.append(('error', msg))
+    self.idle()
+
+  def info(self, msg):
+    self._messages.append(('info', msg))
+    self.idle()
+
+  def idle(self):
+    if self._messages:
+      self.setText(4, self._messages[-1][0])
+      self.setData(4, Qt.ToolTipRole, "Click for more info")
+    else:
+      self.setText(4, '')
+      self.setData(4, Qt.ToolTipRole, "Up to date")
+
+  def updating(self):
+    self.setText(4, 'updating')
+
+  def showMessages(self):
+    msg = ""
+    for m in self._messages:
+      msg += '\n' + m[0].upper() + ': ' + m[1]
+    log.debug(msg)
+    if msg:
+      QMessageBox.information(self.treeWidget().window(), "Log", msg)
+    self._messages.clear()
+    self.idle()
 
   def failure(self, uid=None, etype=None, metadata=None, path=None, exception=None):
     self._entry = None
@@ -410,8 +469,8 @@ class DocTreeItem(QTreeWidgetItem):
     # commented flag settings should be uncommented once move/rename are implemented
     if isinstance(entry, Document):
       flags |= Qt.ItemNeverHasChildren #| Qt.ItemIsDragEnabled
-      # if not entry.index.isReadOnly() and not entry.isDeleted():
-      #   flags |= Qt.ItemIsEditable
+      if not entry.index.isReadOnly() and not entry.isDeleted():
+        flags |= Qt.ItemIsEditable
       self.setText(0, entry.visibleName)
       if isinstance(entry, Notebook):
         self.setIcon(0, icon['notebook'])
@@ -425,6 +484,7 @@ class DocTreeItem(QTreeWidgetItem):
       self.setText(1, entry.updatedOn())
       self.setText(2, "1" if entry.pinned else "")
     elif isinstance(entry, TrashBin):
+      flags = Qt.ItemIsEnabled
       # flags |= Qt.ItemIsDropEnabled
       self.setText(0, entry.visibleName)
       self.setIcon(0, icon['trash'])
@@ -432,8 +492,8 @@ class DocTreeItem(QTreeWidgetItem):
       self.setText(2, "")
     else:
       # flags |= Qt.ItemIsDropEnabled | Qt.ItemIsDragEnabled
-      # if not entry.index.isReadOnly() and not entry.isDeleted():
-      #   flags |= Qt.ItemIsEditable
+      if not entry.index.isReadOnly() and not entry.isDeleted():
+        flags |= Qt.ItemIsEditable
       self.setText(0, entry.visibleName)
       self.setIcon(0, icon['folder'])
       self.setText(3, "Folder")
@@ -465,7 +525,7 @@ class DocTree(QTreeWidget):
     self.setMinimumWidth(400)
     self.setIconSize(QSize(24,24))
     # self.setColumnCount(4)
-    self.setHeaderLabels(["Name", "Updated", "", "Type"])
+    self.setHeaderLabels(["Name", "Updated", "", "Type", ""])
     self.setUniformRowHeights(False)
     self.header().setStretchLastSection(False)
     self.header().setSectionResizeMode(0, QHeaderView.Stretch)
@@ -475,6 +535,11 @@ class DocTree(QTreeWidget):
     self.setItemDelegateForColumn(3, self._noeditDelegate)
     self._pinnedDelegate = PinnedDelegate()
     self.setItemDelegateForColumn(2, self._pinnedDelegate)
+    self.setItemDelegateForColumn(4, self._noeditDelegate)
+    self.header().setSectionResizeMode(2, QHeaderView.Fixed)
+    self._statusDelegate = StatusDelegate()
+    self.setItemDelegateForColumn(4, self._statusDelegate)
+    self.header().setSectionResizeMode(4, QHeaderView.Fixed)
 
     self.setEditTriggers(self.SelectedClicked | self.EditKeyPressed)
     self.setSelectionMode(self.ExtendedSelection)
@@ -519,12 +584,18 @@ class DocTree(QTreeWidget):
         for d in f.files:
           d = index.get(d)
           c = nodes[d.uid] = DocTreeItem(d, p)
+          if d.deleted: c.warning("Item deleted from trash but still on disk")
         for d in f.folders:
           d = index.get(d)
           c = nodes[d.uid] = DocTreeItem(d, p)
+          if d.deleted: c.warning("Item deleted from trash but still on disk")
 
     self.sortItems(0, Qt.AscendingOrder)
     self.resizeColumnToContents(2)
+    self.resizeColumnToContents(4)
+    if index.isReadOnly(): self.setColumnHidden(4, True)
+    self.header().moveSection(2,1)
+    self.itemClicked.connect(self.showMessages)
 
   def itemOf(self, uid):
     if isinstance(uid, Entry):
@@ -579,6 +650,7 @@ class DocTree(QTreeWidget):
     self._nodes[uid] = i = self._pending_item[uid]
     del self._pending_item[uid]
     i.setEntry(self.index.get(uid))
+    i.idle()
 
   @pyqtSlot(Exception, str, int, dict, Path)
   def newEntryError(self, exception, uid, etype, meta, path=None):
@@ -591,18 +663,42 @@ class DocTree(QTreeWidget):
         i.failure(uid, etype, meta, path, exception)
         i.dismissed.connect(lambda: self._removePending(uid))
 
+  @pyqtSlot(str, dict, dict)
+  def updateEntryPrepare(self, uid, new_meta, new_cont):
+    item = self._nodes.get(uid)
+    if item: item.updating()
 
-  @pyqtSlot(str, int, dict)
-  def updateEntryPrepare(self, uid, etype, new_meta):
-    pass
+  @pyqtSlot(str, dict, dict)
+  def updateEntryComplete(self, uid, new_meta, new_cont):
+    item = self._nodes.get(uid)
+    if item:
+      entry = self.index.get(uid)
+      item.setEntry(entry)
+      if 'parent' in new_meta:
+        p = self._nodes.get(entry.parent)
+        i = item.parent().indexOfChild(item)
+        if p is not None and i:
+          item = item.parent().takeChild(i)
+          p.addChild(item)
+        else:
+          item.warning("Could not move to new parent folder. Try restarting Remy.")
+          log.error("Something when wrong in reparenting item")
+      item.idle()
+      self.itemSelectionChanged.emit()
 
-  @pyqtSlot(str, int, dict)
-  def updateEntryComplete(self, uid, etype, new_meta):
-    pass
+  @pyqtSlot(Exception, str, dict, dict)
+  def updateEntryError(self, exception, uid, new_meta, new_cont):
+    item = self._nodes.get(uid)
+    if item:
+      item.setEntry(self.index.get(uid))
+      msg = str(exception) or exception.__class__.__name__
+      item.error('Failed to update item: %s' % msg)
+      self.itemSelectionChanged.emit()
 
-  @pyqtSlot(Exception, str, int, dict)
-  def updateEntryError(self, exception, uid, etype, new_meta):
-    pass
+  @pyqtSlot(QTreeWidgetItem, int)
+  def showMessages(self, item, col):
+    if col == 4:
+      item.showMessages()
 
   def _removePending(self, uid):
     i = self._pending_item.get(uid)
@@ -709,7 +805,7 @@ class Actions:
 
   def enableAccordingToSelection(self, sel, pending=False):
     allFolders = True
-    anyFolders = anyPinned = anyUnpinned = anyTrash = False
+    anyFolders = anyPinned = anyUnpinned = anyDeleted = False
     empty = len(sel) == 0
     singleSel = len(sel) == 1
     for e in sel:
@@ -717,25 +813,20 @@ class Actions:
       anyFolders = anyFolders or e.isFolder()
       anyPinned = anyPinned or (e.pinned == True)
       anyUnpinned = anyUnpinned or (e.pinned == False)
-      anyTrash = anyTrash or e.isTrash()
+      anyDeleted = anyDeleted or e.isIndirectlyDeleted()
     self.preview.setEnabled(not (empty or anyFolders))
     # self.export.setEnabled(not (empty or anyFolders)) # once implemented
-    self.export.setEnabled(singleSel and not (anyFolders or anyTrash))
-    self.upload.setEnabled(singleSel and allFolders and not anyTrash)
-    self.rename.setEnabled(singleSel and not anyTrash)
-    self.addToPinned.setEnabled(anyUnpinned and not anyTrash)
-    self.remFromPinned.setEnabled(anyPinned and not anyTrash)
-    self.newFolder.setEnabled(singleSel and not anyTrash)
-    self.newFolderWith.setEnabled(not (empty or anyTrash))
-    self.delete.setEnabled(not (empty or anyTrash))
+    self.export.setEnabled(singleSel and not anyFolders)
+    self.upload.setEnabled(singleSel and allFolders and not anyDeleted)
+    self.rename.setEnabled(singleSel)
+    self.addToPinned.setEnabled(anyUnpinned and not anyDeleted)
+    self.remFromPinned.setEnabled(anyPinned and not anyDeleted)
+    self.newFolder.setEnabled(singleSel and not anyDeleted)
+    self.newFolderWith.setEnabled(not (empty or anyDeleted))
+    self.delete.setEnabled(not (empty or anyDeleted))
     self.cancelPending.setVisible(pending)
     self.dismissErrors.setVisible(pending)
     ### making invisible the ones not currently implemented:
-    self.rename.setVisible(False)
-    self.addToPinned.setVisible(False)
-    self.remFromPinned.setVisible(False)
-    self.newFolderWith.setVisible(False)
-    self.delete.setVisible(False)
     self.cancelPending.setVisible(False)
     self.dismissErrors.setVisible(False)
 
@@ -748,6 +839,9 @@ class Actions:
       self.export,
       self.newSep(),
       self.delete,
+      self.newSep(),
+      self.addToPinned,
+      self.remFromPinned,
     ]
 
   def ctxtMenuActions(self):
@@ -756,7 +850,7 @@ class Actions:
       self.newSep(),
       self.newFolder,
       self.newFolderWith,
-      self.newSep(),
+      # self.newSep(),
       self.rename,
       self.addToPinned,
       self.remFromPinned,
@@ -765,8 +859,8 @@ class Actions:
       self.newSep(),
       self.upload,
       self.export,
-      self.newSep(),
-      self.test,
+      # self.newSep(),
+      # self.test,
     ]
 
   def actionsDict(self):
@@ -818,6 +912,7 @@ class FileBrowser(QMainWindow):
 
     self.actions = Actions(self, isLive=not self.index.isReadOnly())
     self._connectActions()
+    tree.itemChanged.connect(self.itemChanged)
 
     self.setUnifiedTitleAndToolBarOnMac(True)
     tb = QToolBar("Documents")
@@ -843,14 +938,29 @@ class FileBrowser(QMainWindow):
     a.preview.triggered.connect(self.openSelected)
     a.export.triggered.connect(self.exportSelected)
     a.newFolder.triggered.connect(self.newFolder)
-    # a.delete.triggered.connect(self.deleteEntry)
+    a.newFolderWith.triggered.connect(self.newFolderWith)
+    a.rename.triggered.connect(self.editCurrent)
+    a.addToPinned.triggered.connect(self.pinSelected)
+    a.remFromPinned.triggered.connect(self.unpinSelected)
     a.test.triggered.connect(self.test)
     a.upload.triggered.connect(self.uploadIntoCurrentEntry)
+    a.delete.triggered.connect(self.deleteSelected)
     self.tree.itemSelectionChanged.connect(self.selectionChanged)
 
   @pyqtSlot()
   def selectionChanged(self):
     self.actions.enableAccordingToSelection([i.entry() for i in self.tree.selectedItems()], self.tree.hasPendingItems())
+
+  @pyqtSlot(QTreeWidgetItem, int)
+  def itemChanged(self, item, col):
+    name = item.text(0)
+    entry = item.entry()
+    if col == 0 and entry and entry.name() != name:
+      if name:
+        log.debug('Rename %s -> %s', entry.name(), name)
+        Worker(self.index.rename, entry.uid, name).start()
+      else:
+        item.setText(0, entry.name())
 
   @pyqtSlot(str, list,list)
   def _requestUpload(self, p, dirs, files):
@@ -859,8 +969,7 @@ class FileBrowser(QMainWindow):
     for doc in files:
       log.info("Uploading %s to %s", doc, e.visibleName if e else "root")
       cont = opt.get(str(doc)[-3:].lower() + "_options", {})
-      op = UploadWorker(self.index, path=doc, metadata={'parent': p}, content=cont)
-      QThreadPool.globalInstance().start(op)
+      UploadWorker(self.index, path=doc, parent=p, content=cont).start()
 
   # @pyqtSlot()
   # def selClear(self):
@@ -894,9 +1003,7 @@ class FileBrowser(QMainWindow):
   def test(self):
     item = self.tree.currentItem() or self.tree.invisibleRootItem()
     p = self.tree.currentEntry()
-    op = TestWorker(self.index, metadata={'parent': p.uid, 'visibleName': "Test Note"})
-    QThreadPool.globalInstance().start(op)
-
+    TestWorker(self.index, parent=p.uid, visibleName="Test Note").start()
 
   @pyqtSlot()
   def openSelected(self):
@@ -925,6 +1032,12 @@ class FileBrowser(QMainWindow):
       exportDocument(entry, self)
 
   @pyqtSlot()
+  def editCurrent(self):
+    item = self.tree.currentItem()
+    if item:
+      self.tree.editItem(item)
+
+  @pyqtSlot()
   def uploadIntoCurrentEntry(self):
     entry = self.tree.currentEntry()
     if entry and not entry.index.isReadOnly():
@@ -941,12 +1054,40 @@ class FileBrowser(QMainWindow):
       name, ok = QInputDialog.getText(self, "New Folder in %s" % entry.name(),
                                       "Name of new folder:", text="New Folder")
       if ok and name:
-        op = NewFolderWorker(self.index, metadata={'parent': entry.uid, 'visibleName': name})
-        QThreadPool.globalInstance().start(op)
+        NewFolderWorker(self.index, parent=entry.uid, visibleName=name).start()
 
-  # @pyqtSlot()
-  # def deleteSelected(self):
-  #   pass
+  @pyqtSlot()
+  def deleteSelected(self):
+    for item in self.tree.selectedItems():
+      entry = item.entry()
+      if entry:
+        Worker(self.index.moveToTrash, entry.uid).start()
+
+  @pyqtSlot()
+  def pinSelected(self):
+    for item in self.tree.selectedItems():
+      entry = item.entry()
+      if entry:
+        Worker(lambda: self.index.update(entry.uid, pinned=True)).start()
+
+  @pyqtSlot()
+  def unpinSelected(self):
+    for item in self.tree.selectedItems():
+      entry = item.entry()
+      if entry:
+        Worker(lambda: self.index.update(entry.uid, pinned=False)).start()
+
+  @pyqtSlot()
+  def newFolderWith(self):
+    entries = [ item.entry() for item in self.tree.selectedItems() if item.entry() ]
+    if entries:
+      # parent of first entry is parent of new folder
+      parent = entries[0].parentEntry()
+      name, ok = QInputDialog.getText(self, "New Folder in %s" % parent.name(),
+                                      "Name of new folder (with %d items):" % len(entries),
+                                      text="New Folder")
+      if ok and name:
+        Worker(self.index.newFolderWith, [ e.uid for e in entries], parent=parent.uid, visibleName=name).start()
 
 
 
@@ -964,6 +1105,11 @@ class NewEntryWorker(QRunnable):
     NewEntryWorker._pending[self.uid] = self
     self._args   = args
     self._cancel = False
+
+  def start(self, pool=None):
+    if pool is None:
+      pool = QThreadPool.globalInstance()
+    pool.start(self)
 
   # @pyqtSlot(bool) # compatibility with clicked of button
   def cancel(self, *a):
@@ -1021,3 +1167,23 @@ class TestWorker(NewEntryWorker):
     self.index.test('Test.pdf', uid=self.uid, progress=self._progress, **self._args)
     log.debug("Stopping fake upload")
 
+
+class Worker(QRunnable):
+
+  def __init__(self, fn, *args, **kwargs):
+    QRunnable.__init__(self)
+    self.fn      = fn
+    self._args   = args
+    self._kwargs = kwargs
+
+  def start(self, pool=None):
+    if pool is None:
+      pool = QThreadPool.globalInstance()
+    pool.start(self)
+
+  def run(self):
+    try:
+      self.fn(*self._args, **self._kwargs)
+    except Exception as e:
+      import traceback
+      traceback.print_exc()
