@@ -669,17 +669,17 @@ class RemarkableIndex:
         return k
     return None
 
-  def pathOf(self, uid, exact=True, trash_too=False):
-    if not exact:
-      uid = self.match_id(uid)
-    p = []
-    while uid:
-      if uid in self.index and (trash_too or not self.isDeleted(uid)):
-          p.append(self.index[uid].visibleName)
-          uid = self.index[uid].parent
-      else:
-        return None
-    return reversed(p[1:])
+  # def pathOf(self, uid, exact=True, trash_too=False):
+  #   if not exact:
+  #     uid = self.match_id(uid)
+  #   p = []
+  #   while uid:
+  #     if uid in self.index and (trash_too or not self.isDeleted(uid)):
+  #         p.append(self.index[uid].visibleName)
+  #         uid = self.index[uid].parent
+  #     else:
+  #       return None
+  #   return reversed(p[1:])
 
   def findByName(self, name, exact=False):
     if exact:
