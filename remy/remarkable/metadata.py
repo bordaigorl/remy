@@ -165,6 +165,9 @@ class Folder(Entry):
   def isRoot(self):
     return False
 
+  def typeName(self):
+    return "folder"
+
 
 ROOT_ID = ''
 TRASH_ID = 'trash'
@@ -210,6 +213,9 @@ class TrashBin(Folder):
   def items(self):
     yield from self.folders
     yield from self.files
+
+  def typeName(self):
+    return "trash"
 
 
 class Document(Entry):
@@ -307,6 +313,9 @@ class Notebook(Document):
       template = None
     return Page(layers, version, pageNum, document=self, background=template)
 
+  def typeName(self):
+    return "notebook"
+
 
 class PDFBasedDoc(Document):
 
@@ -360,13 +369,18 @@ class PDFBasedDoc(Document):
 
 
 class PDFDoc(PDFBasedDoc):
-  pass
+
+  def typeName(self):
+    return "pdf"
 
 
 class EBook(PDFBasedDoc):
 
   def originalName(self):
     return self.uid + '.epub'
+
+  def typeName(self):
+    return "epub"
 
 
 DOC_BASE_METADATA = {
