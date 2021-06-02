@@ -465,6 +465,7 @@ class DocTreeItem(QTreeWidgetItem):
     self.setFirstColumnSpanned(False)
     self._entry = entry
     icon = self.treeWidget()._icon
+    self.setData(0, Qt.UserRole, entry.uid)
     flags = Qt.ItemIsEnabled | Qt.ItemIsSelectable
     # commented flag settings should be uncommented once move/rename are implemented
     if isinstance(entry, Document):
@@ -877,7 +878,11 @@ class FileBrowser(QMainWindow):
     splitter = self.splitter = QSplitter()
     splitter.setHandleWidth(0)
 
-    tree = self.tree = DocTree(index, splitter)
+    central = QStackedWidget(splitter)
+    tree = self.tree = DocTree(index)
+    central.addWidget(tree)
+    tree.stack = central
+    # tree = self.tree = DocTree(index, splitter)
     info = self.info = InfoPanel(index, splitter)
     # info.setEntry(index.root())
     info.uploadRequest.connect(self._requestUpload)
