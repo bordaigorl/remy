@@ -25,55 +25,56 @@ DOCTYPE = {
 }
 
 
-class DocTreeItem(QTreeWidgetItem):
 
-  class UploadingItem(QWidget):
+class UploadingItem(QWidget):
 
-    def __init__(self, title, cancel=False, parent=None, tree=None):
-      QWidget.__init__(self, parent=parent)
-      layout = QHBoxLayout(self)
-      layout.setContentsMargins(5, 5, 0, 0)
-      # layout.addStrut(24)
-      self.label = QLabel(title)
-      self.progress = QProgressBar()
-      self.progress.setRange(0, 0)
-      # self.progress.setValue(3)
-      layout.addWidget(self.label)
-      layout.addWidget(self.progress)
-      if cancel:
-        self.cancelBtn = QPushButton("Cancel")
-        if tree:
-          self.cancelBtn.setMinimumWidth(tree.columnWidth(3))
-        layout.addWidget(self.cancelBtn)
-
-  class ErrorItem(QWidget):
-
-    def __init__(self, title, msg, parent=None, tree=None):
-      QWidget.__init__(self, parent=parent)
-      layout = QHBoxLayout(self)
-      layout.setContentsMargins(5, 5, 0, 0)
-      # layout.addStrut(24)
-      self.label = QLabel(title)
-      msg = msg.strip()
-      self.msg = msg
-      if len(msg) > 30:
-        msg = msg[:30] + '…  <a href="#">More info</a>'
-      self.message = QLabel('<font color="Red">%s</font>' % msg)
-      self.message.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-      self.message.linkActivated.connect(self.showMsg)
-      bla = QLabel("Bla")
-      layout.addWidget(self.label)
-      layout.addSpacing(10)
-      layout.addWidget(self.message,2)
-      self.dismissBtn = QPushButton("Dismiss")
+  def __init__(self, title, cancel=False, parent=None, tree=None):
+    QWidget.__init__(self, parent=parent)
+    layout = QHBoxLayout(self)
+    layout.setContentsMargins(5, 5, 0, 0)
+    # layout.addStrut(24)
+    self.label = QLabel(title)
+    self.progress = QProgressBar()
+    self.progress.setRange(0, 0)
+    # self.progress.setValue(3)
+    layout.addWidget(self.label)
+    layout.addWidget(self.progress)
+    if cancel:
+      self.cancelBtn = QPushButton("Cancel")
       if tree:
-        self.dismissBtn.setMinimumWidth(tree.columnWidth(3))
-      layout.addWidget(self.dismissBtn)
+        self.cancelBtn.setMinimumWidth(tree.columnWidth(3))
+      layout.addWidget(self.cancelBtn)
 
-    @pyqtSlot(str)
-    def showMsg(self, href):
-      QMessageBox.critical(self.window(), "Error", "Something went wrong:\n\n" + self.msg)
+class ErrorItem(QWidget):
 
+  def __init__(self, title, msg, parent=None, tree=None):
+    QWidget.__init__(self, parent=parent)
+    layout = QHBoxLayout(self)
+    layout.setContentsMargins(5, 5, 0, 0)
+    # layout.addStrut(24)
+    self.label = QLabel(title)
+    msg = msg.strip()
+    self.msg = msg
+    if len(msg) > 30:
+      msg = msg[:30] + '…  <a href="#">More info</a>'
+    self.message = QLabel('<font color="Red">%s</font>' % msg)
+    self.message.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+    self.message.linkActivated.connect(self.showMsg)
+    bla = QLabel("Bla")
+    layout.addWidget(self.label)
+    layout.addSpacing(10)
+    layout.addWidget(self.message,2)
+    self.dismissBtn = QPushButton("Dismiss")
+    if tree:
+      self.dismissBtn.setMinimumWidth(tree.columnWidth(3))
+    layout.addWidget(self.dismissBtn)
+
+  @pyqtSlot(str)
+  def showMsg(self, href):
+    QMessageBox.critical(self.window(), "Error", "Something went wrong:\n\n" + self.msg)
+
+
+class DocTreeItem(QTreeWidgetItem):
 
   def __init__(self, entry=None, parent=None, **kw):
     super().__init__(parent)
@@ -90,7 +91,7 @@ class DocTreeItem(QTreeWidgetItem):
     self.setFirstColumnSpanned(True)
     title = metadata.get('visibleName', path.stem if path else 'Untitled')
     doctype = DOCTYPE.get(etype)
-    self.uploadingWidget = self.UploadingItem(title, cancel, tree=self.treeWidget())
+    self.uploadingWidget = UploadingItem(title, cancel, tree=self.treeWidget())
     if self.treeWidget():
       self.treeWidget().setItemWidget(self, 0, self.uploadingWidget)
     if doctype is not None:
@@ -99,7 +100,7 @@ class DocTreeItem(QTreeWidgetItem):
 
   @property
   def cancelled(self):
-    if isinstance(self.uploadingWidget, self.UploadingItem):
+    if isinstance(self.uploadingWidget, UploadingItem):
       return self.uploadingWidget.cancelBtn.clicked
     return None
 
@@ -147,7 +148,7 @@ class DocTreeItem(QTreeWidgetItem):
     self.setFirstColumnSpanned(True)
     title = metadata.get('visibleName', path.stem if path else 'Unnamed')
     doctype = DOCTYPE.get(etype)
-    self.uploadingWidget = self.ErrorItem(title, str(exception), tree=self.treeWidget())
+    self.uploadingWidget = ErrorItem(title, str(exception), tree=self.treeWidget())
     # self.uploadingWidget.dismissBtn.clicked.connect()
     if self.treeWidget():
       self.treeWidget().setItemWidget(self, 0, self.uploadingWidget)
@@ -157,14 +158,14 @@ class DocTreeItem(QTreeWidgetItem):
 
   @property
   def dismissed(self):
-    if isinstance(self.uploadingWidget, self.ErrorItem):
+    if isinstance(self.uploadingWidget, ErrorItem):
       return self.uploadingWidget.dismissBtn.clicked
     return None
 
   def status(self):
     if self.uploadingWidget is None and self._entry is not None:
       return DocTreeItem.OK
-    elif isinstance(self.uploadingWidget, self.UploadingItem):
+    elif isinstance(self.uploadingWidget, UploadingItem):
       return DocTreeItem.PROGRESS
     else:
       return DocTreeItem.ERROR
@@ -227,6 +228,7 @@ class DocTreeItem(QTreeWidgetItem):
 DocTreeItem.OK = 0
 DocTreeItem.PROGRESS = 1
 DocTreeItem.ERROR = 2
+
 
 class DocTree(QTreeWidget):
 
@@ -306,7 +308,7 @@ class DocTree(QTreeWidget):
     self.resizeColumnToContents(2)
     self.resizeColumnToContents(4)
     if index.isReadOnly(): self.setColumnHidden(4, True)
-    self.header().moveSection(2,1)
+    # self.header().moveSection(2,1)
     self.itemClicked.connect(self.showMessages)
 
   def itemOf(self, uid):

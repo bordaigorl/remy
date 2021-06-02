@@ -1,5 +1,6 @@
 <!DOCTYPE RCC><RCC version="1.0">
 <qresource>
+    <file>assets/16/browser.svg</file>
     <file>assets/16/epub.svg</file>
     <file>assets/16/export.svg</file>
     <file>assets/16/case.svg</file>

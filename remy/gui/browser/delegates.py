@@ -16,8 +16,9 @@ class PinnedDelegate(NoEditDelegate):
       PinnedDelegate._icon = QPixmap(":assets/symbolic/starred.svg")
 
   def paint(self, painter, style, i):
+    # self.initStyleOption(style, i)
     QStyledItemDelegate.paint(self, painter, style, QModelIndex())
-    if i.data():
+    if i.data() == "1":
       p = style.rect.center()
       painter.drawPixmap(p.x()-8,p.y()-8, PinnedDelegate._icon)
 

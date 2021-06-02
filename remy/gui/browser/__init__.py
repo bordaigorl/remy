@@ -14,19 +14,14 @@ from remy.gui.export import webUIExport, exportDocument
 from remy.gui.browser.info import InfoPanel
 from remy.gui.browser.doctree import *
 from remy.gui.browser.workers import *
-
+from remy.gui.search import *
 
 # I could have used QWidget.addAction to attach these to the tree/main window
 # but this way I get a bit more flexibility
 class Actions:
 
-  SEPARATOR = None
-
-  def newSep(self):
-    return self.SEPARATOR
-    sep = QAction()
-    sep.setSeparator(True)
-    return sep
+  SEPARATOR = 0
+  SPACER = 1
 
   def __init__(self, parent=None, isLive=False):
     # if all non folders
@@ -73,6 +68,35 @@ class Actions:
     self.dismissErrors.setIcon(QIcon(":assets/16/clear-all.svg"))
     #
     self.test = QAction('Test', parent)
+    #
+    self.browse = QAction('Browse folders')
+    self.browse.setIcon(QIcon(":assets/16/browser.svg"))
+    self.browse.setCheckable(True)
+    self.listPdfs = QAction('List all PDFs')
+    self.listPdfs.setIcon(QIcon(":assets/16/pdf.svg"))
+    self.listPdfs.setCheckable(True)
+    self.listEpubs = QAction('List all EPUBs')
+    self.listEpubs.setIcon(QIcon(":assets/16/epub.svg"))
+    self.listEpubs.setCheckable(True)
+    self.listNotebooks = QAction('List all Notebooks')
+    self.listNotebooks.setIcon(QIcon(":assets/16/notebook.svg"))
+    self.listNotebooks.setCheckable(True)
+    self.listPinned = QAction('List all Favourites')
+    self.listPinned.setIcon(QIcon(":assets/symbolic/starred.svg"))
+    self.listPinned.setCheckable(True)
+    self.listResults = QAction('List search results')
+    self.listResults.setIcon(QIcon(":assets/symbolic/search.svg"))
+    self.listResults.setCheckable(True)
+    self.listResults.setVisible(False)
+    self.listResults.toggled.connect(lambda c: self.listResults.setVisible(c))
+    self.listsGroup = QActionGroup(parent)
+    self.listsGroup.addAction(self.browse)
+    self.listsGroup.addAction(self.listPdfs)
+    self.listsGroup.addAction(self.listEpubs)
+    self.listsGroup.addAction(self.listNotebooks)
+    self.listsGroup.addAction(self.listPinned)
+    self.listsGroup.addAction(self.listResults)
+    self.listsGroup.setExclusive(True)
     #
     self.setLive(isLive)
     self.enableAccordingToSelection([])
@@ -123,32 +147,39 @@ class Actions:
   def toolBarActions(self):
     return [
       self.newFolder,
-      self.newSep(),
+      self.SEPARATOR,
       self.upload,
       self.export,
-      self.newSep(),
+      self.SEPARATOR,
       self.delete,
-      self.newSep(),
+      self.SEPARATOR,
       self.addToPinned,
       self.remFromPinned,
+      self.SEPARATOR,
+      self.browse,
+      self.listPdfs,
+      self.listEpubs,
+      self.listNotebooks,
+      self.listPinned,
+      self.listResults,
     ]
 
   def ctxtMenuActions(self):
     return [
       self.preview,
-      self.newSep(),
+      self.SEPARATOR,
       self.newFolder,
       self.newFolderWith,
-      # self.newSep(),
+      # self.SEPARATOR,
       self.rename,
       self.addToPinned,
       self.remFromPinned,
-      self.newSep(),
+      self.SEPARATOR,
       self.delete,
-      self.newSep(),
+      self.SEPARATOR,
       self.upload,
       self.export,
-      # self.newSep(),
+      # self.SEPARATOR,
       # self.test,
     ]
 
@@ -166,15 +197,15 @@ class FileBrowser(QMainWindow):
     splitter = self.splitter = QSplitter()
     splitter.setHandleWidth(0)
 
-    central = QStackedWidget(splitter)
+    central = self.stack = QStackedWidget(splitter)
     tree = self.tree = DocTree(index)
+    results = self.results = SearchResults(tree.index)
+
     central.addWidget(tree)
-    tree.stack = central
-    # tree = self.tree = DocTree(index, splitter)
+    central.addWidget(results)
+
     info = self.info = InfoPanel(index, splitter)
-    # info.setEntry(index.root())
     info.uploadRequest.connect(self._requestUpload)
-    splitter.setCollapsible(1,True)
 
     # @pyqtSlot(QModelIndex,QModelIndex)
     # def onsel(cur, prev):
@@ -183,8 +214,10 @@ class FileBrowser(QMainWindow):
     tree.itemActivated.connect(self.openEntry)
     tree.currentItemChanged.connect(self.entrySelected)
     tree.contextMenu.connect(self.contextMenu)
-
     # tree.selectionCleared.connect(self.selClear)
+
+    results.selected.connect(self.resultSelected)
+    results.activated.connect(self.resultActivated)
 
     self.viewers = {}
 
@@ -206,25 +239,47 @@ class FileBrowser(QMainWindow):
     self.actions = Actions(self, isLive=not self.index.isReadOnly())
     self._connectActions()
     tree.itemChanged.connect(self.itemChanged)
+    self.showResAct = act = QAction("Show in enclosing folder")
+    act.triggered.connect(self.resultActivated)
+    results.addAction(act)
+    results.addAction(self.actions.preview)
+    results.addAction(self.actions.export)
+    results.queryChanged.connect(self.searchQueryChanged)
 
     self.setUnifiedTitleAndToolBarOnMac(True)
     tb = QToolBar("Documents")
     sep = True
     for a in self.actions.toolBarActions():
-      if a != Actions.SEPARATOR:
+      if a == Actions.SPACER:
+        spacer = QWidget()
+        spacer.setSizePolicy(QSizePolicy.Expanding,QSizePolicy.Preferred)
+        tb.addWidget(spacer)
+        sep = False
+      elif a != Actions.SEPARATOR:
         tb.addAction(a)
-        sep = tb.isVisible()
+        sep = a.isVisible()
       elif sep:
         tb.addSeparator()
         sep = False
     tb.setIconSize(QSize(16,16))
     tb.setFloatable(False)
     tb.setMovable(False)
+    searchBar = self.searchBar = SearchBar()
+    searchBar.queryEdited.connect(self.searchQueryEdited)
+    searchBar.setOptionsMenu(results.optionsMenu())
+    # spacer = QWidget()
+    # spacer.setSizePolicy(QSizePolicy.Expanding,QSizePolicy.Preferred)
+    # tb.addWidget(spacer)
+    tb.addWidget(searchBar)
     self.addToolBar(tb)
+
+    splitter.setCollapsible(1,True)
 
     rootitem = self.tree.invisibleRootItem()
     self.tree.setCurrentItem(rootitem)
     self.entrySelected(rootitem,rootitem)
+    self.selectView(self.actions.browse)
+
 
   def _connectActions(self):
     a = self.actions
@@ -238,7 +293,37 @@ class FileBrowser(QMainWindow):
     a.test.triggered.connect(self.test)
     a.upload.triggered.connect(self.uploadIntoCurrentEntry)
     a.delete.triggered.connect(self.deleteSelected)
+    a.listsGroup.triggered.connect(self.selectView)
     self.tree.itemSelectionChanged.connect(self.selectionChanged)
+
+  @pyqtSlot(QAction)
+  def selectView(self, which):
+    which.setChecked(True)
+    if which is self.actions.browse:
+      self.lastView = which
+      self.results.setQuery(None)
+      self.results.showDeleted(False)
+      self.results.showPinnedOnly(False)
+      self.results.showAllTypes()
+      self.stack.setCurrentWidget(self.tree)
+    else:
+      self.tree.clearSelection()
+      if which is not self.actions.listResults:
+        self.lastView = which
+        # self.searchBar.clear()
+        self.results.showDeleted(False)
+        self.results.showPinnedOnly(False)
+        self.results.setQuery(None)
+      if which is self.actions.listPdfs:
+        self.results.showOnlyType("pdf")
+      elif which is self.actions.listEpubs:
+        self.results.showOnlyType("epub")
+      elif which is self.actions.listNotebooks:
+        self.results.showOnlyType("notebook")
+      elif which is self.actions.listPinned:
+        self.results.showAllTypes()
+        self.results.showPinnedOnly(True)
+      self.stack.setCurrentWidget(self.results)
 
   @pyqtSlot()
   def selectionChanged(self):
@@ -287,7 +372,7 @@ class FileBrowser(QMainWindow):
         if a.isEnabled():
           menu.addAction(a)
           sep = True
-      elif sep:
+      else:#if sep:
         menu.addSeparator()
         sep = False
     menu.popup(self.tree.mapToGlobal(event.pos()))
@@ -382,3 +467,30 @@ class FileBrowser(QMainWindow):
       if ok and name:
         Worker(self.index.newFolderWith, [ e.uid for e in entries], parent=parent.uid, visibleName=name).start()
 
+
+  def resultSelected(self, item):
+    uid = self.results.uidOfItem(item)
+    self.tree.setCurrentItem(self.tree.itemOf(uid))
+
+
+  def resultActivated(self, item):
+    if not isinstance(item, QModelIndex):
+      item = self.results.currentIndex()
+    uid = self.results.uidOfItem(item)
+    self.tree.setCurrentItem(self.tree.itemOf(uid))
+    self.searchBar.clear()
+
+
+  # This logic is not working well.
+  # Probably better idea is to save which view was last when triggering search
+  @pyqtSlot(str)
+  def searchQueryEdited(self, txt):
+    self.results.setQuery(txt)
+
+  @pyqtSlot(str)
+  def searchQueryChanged(self, txt):
+    self.searchBar.setQuery(txt)
+    if txt:
+      self.selectView(self.actions.listResults)
+    elif self.actions.listsGroup.checkedAction() is self.actions.listResults:
+      self.selectView(self.lastView)
