@@ -17,7 +17,7 @@ from remy.remarkable.filesource import (
 )
 import remy.gui.resources
 from remy.gui.notebookview import *
-from remy.gui.filebrowser import *
+from remy.gui.browser import *
 from remy.connect import connect, BadHostKeyException, UnknownHostKeyException
 
 import time
