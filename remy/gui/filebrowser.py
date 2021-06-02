@@ -771,7 +771,7 @@ class Actions:
     #
     # non root
     self.newFolderWith = QAction('New Folder with Selection', parent)
-    self.newFolderWith.setIcon(QIcon(":assets/16/folder.svg"))
+    self.newFolderWith.setIcon(QIcon(":assets/16/folder-with.svg"))
     #
     # non root
     self.delete = QAction('Move to Trash', parent)

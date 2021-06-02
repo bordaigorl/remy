@@ -2,8 +2,10 @@
 <qresource>
     <file>assets/16/epub.svg</file>
     <file>assets/16/export.svg</file>
-    <file>assets/16/folder-new.svg</file>
+    <file>assets/16/case.svg</file>
     <file>assets/16/folder.svg</file>
+    <file>assets/16/folder-new.svg</file>
+    <file>assets/16/folder-with.svg</file>
     <file>assets/16/import.svg</file>
     <file>assets/16/cancel.svg</file>
     <file>assets/16/clear-all.svg</file>
@@ -34,8 +36,11 @@
     <file>assets/symbolic/updating.svg</file>
     <file>assets/symbolic/starred.svg</file>
     <file>assets/symbolic/non-starred.svg</file>
+    <file>assets/symbolic/search.svg</file>
     <file>assets/symbolic/updating.svg</file>
     <file>assets/symbolic/ok.svg</file>
+    <file>assets/symbolic/clear.svg</file>
+    <file>assets/symbolic/options.svg</file>
     <file>assets/rm.svg</file>
     <file>assets/remy.svg</file>
     <file>assets/dead.svg</file>
