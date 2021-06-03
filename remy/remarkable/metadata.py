@@ -101,6 +101,9 @@ class Entry:
   def ancestry(self):
     return self.index.ancestryOf(self.uid, exact=True)
 
+  def path(self, delim=None):
+    return self.index.pathOf(self.uid, delim=delim)
+
   def updatedOn(self):
     try:
       updated = arrow.get(int(self.lastModified)/1000).humanize()
@@ -573,7 +576,7 @@ class RemarkableIndex:
     return p
 
   def pathOf(self, uid, exact=True, delim=None):
-    p = map(lambda x: self.index[x].visibleName,
+    p = map(lambda x: self.nameOf(x),
             self.ancestryOf(uid,exact))
     if delim is None:
       return p
@@ -708,8 +711,7 @@ class RemarkableIndex:
     return updated
 
   def nameOf(self, uid):
-    return (self.index[uid].visibleName
-                if uid in self.index else None)
+    return self.get(uid).visibleName
 
   def isDeleted(self, uid):
     return uid != TRASH_ID and (self.index[uid].deleted or self.index[uid].parent == TRASH_ID)
