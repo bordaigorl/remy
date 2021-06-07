@@ -10,7 +10,7 @@ import remy.remarkable.constants as rm
 from PyPDF2 import PdfFileReader, PdfFileWriter
 from PyPDF2.pdf import PageObject
 from PyPDF2.utils import PdfReadError
-from PyPDF2.generic import NullObject
+from PyPDF2.generic import NullObject, RectangleObject, NameObject
 
 from remy.remarkable.metadata import PDFBasedDoc
 from remy.gui.pagerender import BarePageScene, DEFAULT_COLORS, DEFAULT_HIGHLIGHT
@@ -72,8 +72,50 @@ def pdfrotate(outputPath, rotate=0):
   with open(outputPath, 'wb') as out:
     writer.write(out)
 
+def transformDest(d, rot, ratio, tx, ty):
+  if d['/Type'] == '/XYZ':
+    if rot == 90:
+      l = d.left
+      t = d.top
+      d['/Left'] = t*ratio+tx
+      d['/Top'] = l*ratio+ty
+    else: 
+      d['/Left'] = d.left*ratio+tx
+      d['/Top'] = d.top*ratio+ty
+  return d
 
-def pdfmerge(basePath, outputPath, pdfRanges=None, rotate=0, progress=None):
+def transformAnnot(p, rot, ratio, tx, ty):
+  """transform the Annotations of a pdf page (takes the page and the same arguments like mergeRotatedScaledTranslatedPage)"""
+  if '/Annots' in p:
+    for a in p['/Annots']:
+      annot = a.getObject()
+      r = RectangleObject(annot['/Rect'])
+      (x0,y0) = r.upperLeft
+      (x1,y1) = r.lowerRight
+      if rot == 90:
+        x0,y0=y0,x0
+        x1,y1=y1,x1
+      annot.update({NameObject('/Rect'): RectangleObject([x0*ratio+tx,y0*ratio+ty,x1*ratio+tx,y1*ratio+ty])})
+
+def _trafo(w,h,tw,th):
+  if w <= h:
+    if w <= tw:
+      ratio = max(tw / w, th / h)
+    else:
+      ratio = min(tw / w, th / h)
+    tx = 0
+    ty = th - ( h * ratio )
+    rot = 0
+  else:
+    w, h = h, w
+    ratio = min(tw / w, th / h)
+    tx = w * ratio
+    ty = th - ( h * ratio )
+    rot = 90
+  return [rot, ratio, tx, ty]
+
+
+def pdfmerge(basePath, outputPath, pdfRanges=None, rotate=0, progress=None, transform="base"):
   if isinstance(basePath, PdfFileReader):
     baseReader = basePath
   else:
@@ -86,6 +128,11 @@ def pdfmerge(basePath, outputPath, pdfRanges=None, rotate=0, progress=None):
     pageNum = sum(len(r) for r in pdfRanges)
     pdfRanges = chain(*pdfRanges)
   writer = TolerantPdfWriter()
+  # writer.cloneReaderDocumentRoot(baseReader)
+  # PDF-Annotations and metadata can rely on OCG therefore we add them to the base
+  # annot = baseReader.getNamedDestinations()
+  # TODO need to be transformed
+  writer.addMetadata(baseReader.getDocumentInfo())
   _progress(progress, 0, pageNum + 1)
   for apage, page in enumerate(pdfRanges):
     bp = baseReader.getPage(page)
@@ -94,29 +141,33 @@ def pdfmerge(basePath, outputPath, pdfRanges=None, rotate=0, progress=None):
     s = ap.cropBox or ap.artBox
     aw, ah = s.upperRight[0] - s.upperLeft[0], s.upperLeft[1] - s.lowerLeft[1]
     s = bp.cropBox or bp.artBox
-    w, h = s.upperRight[0] - s.upperLeft[0], s.upperLeft[1] - s.lowerLeft[1]
+    bw, bh = s.upperRight[0] - s.upperLeft[0], s.upperLeft[1] - s.lowerLeft[1]
 
-    np = PageObject.createBlankPage(writer, aw, ah)
-    if w <= h:
-      ratio = min(aw / w, ah / h)
-      tx = 0
-      ty = ah - ( h * ratio )
-      rot = 0
+    if transform=="base":
+      np = PageObject.createBlankPage(writer, aw, ah)
+      args = _trafo(bw,bh,aw,ah)
+      np.mergeRotatedScaledTranslatedPage(bp, *args)
+      transformAnnot(np, *args)
+      np.mergePage(ap)
+    elif transform=="annot":
+      np = bp
+      args = _trafo(aw,ah,bw,bh)
+      np.mergeRotatedScaledTranslatedPage(ap, *args)
     else:
-      w, h = h, w
-      ratio = min(aw / w, ah / h)
-      tx = w * ratio
-      ty = ah - ( h * ratio )
-      rot = 90
-    np.mergeRotatedScaledTranslatedPage(bp, rot, ratio, tx, ty)
-    np.mergePage(ap)
+      log.error("Sorry, I can only transform 'base' (pdf) or 'annot'ations.")
+
     if rotate:
       np.rotateCounterClockwise(rotate)
 
     writer.addPage(np)
     _progress(progress, page, pageNum + 1)
+  for nd in baseReader.getNamedDestinations():
+    # FIXME it woulb be nicer to use and transform the dest if applicable
+    # writer.addNamedDestinationObject(baseReader.namedDestinations[nd])
+    print(nd)
+    print(baseReader.namedDestinations[nd].page)
+    # writer.addNamedDestination(nd, )
 
-  writer.removeLinks() # until we implement transformations on annotations
   with open(outputPath, 'wb') as out:
     writer.write(out)
 
