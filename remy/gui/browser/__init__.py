@@ -14,7 +14,7 @@ from remy.gui.export import webUIExport, exportDocument
 from remy.gui.browser.info import InfoPanel
 from remy.gui.browser.doctree import *
 from remy.gui.browser.workers import *
-from remy.gui.search import *
+from remy.gui.browser.search import *
 
 # I could have used QWidget.addAction to attach these to the tree/main window
 # but this way I get a bit more flexibility
