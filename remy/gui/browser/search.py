@@ -153,10 +153,19 @@ class FlatRemarkableIndexModel(QAbstractTableModel):
   def setCaseSensitivity(self, b):
     self._filterName.setFilterCaseSensitivity(b)
 
-  # Should emit the rowInsert model signals
   @pyqtSlot(str, int, dict, object)
   def newEntry(self, uid, meta, pth):
+    r = len(self._uids)
+    self.beginInsertRows(QModelIndex(), r, r)
     self._uids.append(uid)
+    self.endInsertRows()
+
+  @pyqtSlot(str, dict, dict)
+  def updateEntry(self, uid, meta, pth):
+    i = self._uids.index(uid)
+    self.dataChanged.emit(self.createIndex(i,0),self.createIndex(i,3),
+                     [Qt.ToolTipRole, Qt.ForegroundRole, Qt.UserRole + 1,
+                      Qt.UserRole + 2, Qt.UserRole + 3, Qt.DisplayRole])
 
 
 
