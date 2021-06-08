@@ -68,18 +68,11 @@ class UploadWorker(NewEntryWorker):
   def do(self):
     self.index.newDocument(uid=self.uid, progress=self._progress, **self._args)
 
+
 class NewFolderWorker(NewEntryWorker):
 
   def do(self):
     self.index.newFolder(uid=self.uid, progress=self._progress, **self._args)
-
-
-class TestWorker(NewEntryWorker):
-
-  def do(self):
-    log.debug("Starting fake upload")
-    self.index.test('Test.pdf', uid=self.uid, progress=self._progress, **self._args)
-    log.debug("Stopping fake upload")
 
 
 class Worker(QRunnable):

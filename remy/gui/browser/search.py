@@ -7,29 +7,29 @@ log = logging.getLogger('remy')
 
 from remy.gui.browser.delegates import PinnedDelegate
 
+### This proxy can be attached to the model of a DocTree to flatten the hierarchy
+# class FlatRemarkableProxyModel(QAbstractProxyModel):
 
-class FlatRemarkableProxyModel(QAbstractProxyModel):
+#   def __init__(self, tree):
+#     QAbstractProxyModel.__init__(self)
+#     self._uids = list(tree.index.allUids())
+#     self._rows = dict(enumerate(self._uids))
+#     self._tree = tree
 
-  def __init__(self, tree):
-    QAbstractProxyModel.__init__(self)
-    self._uids = list(tree.index.allUids())
-    self._rows = dict(enumerate(self._uids))
-    self._tree = tree
+#   def mapFromSource(self, sourceIndex):
+#     if sourceIndex.isValid():
+#       item = self._tree.itemFromIndex(sourceIndex)
+#       entry = item.entry
+#       if entry:
+#         return self.createIndex(self._rows[entry.uid], sourceIndex.column())
+#     return QModelIndex()
 
-  def mapFromSource(self, sourceIndex):
-    if sourceIndex.isValid():
-      item = self._tree.itemFromIndex(sourceIndex)
-      entry = item.entry
-      if entry:
-        return self.createIndex(self._rows[entry.uid], sourceIndex.column())
-    return QModelIndex()
-
-  def mapToSource(self, proxyIndex):
-    if proxyIndex.isValid() and proxyIndex.row() < len(self._uids):
-      uid = self._uids[proxyIndex.row()]
-      idx = self._tree.indexFromItem(self._tree.itemOf(uid))
-      return self.createIndex(idx.row(), idx.column())
-    return QModelIndex()
+#   def mapToSource(self, proxyIndex):
+#     if proxyIndex.isValid() and proxyIndex.row() < len(self._uids):
+#       uid = self._uids[proxyIndex.row()]
+#       idx = self._tree.indexFromItem(self._tree.itemOf(uid))
+#       return self.createIndex(idx.row(), idx.column())
+#     return QModelIndex()
 
 
 
@@ -40,6 +40,7 @@ class FlatRemarkableIndexModel(QAbstractTableModel):
     self._index = index
     self._uids = list(index.allUids())
     index.signals.newEntryComplete.connect(self.newEntry)
+    index.signals.updateEntryComplete.connect(self.updateEntry)
     self._icon = {
       "trash": QIcon(":assets/24/trash.svg"),
       "folder": QIcon(":assets/24/folder.svg"),
@@ -118,11 +119,6 @@ class FlatRemarkableIndexModel(QAbstractTableModel):
         return entry.typeName().title()
 
     return None
-    # DecorationRole
-    # EditRole
-    # ToolTipRole
-    # StatusTipRole
-    # SizeHintRole
 
   def headerData(self, section, orientation, role):
     if role == Qt.DisplayRole:

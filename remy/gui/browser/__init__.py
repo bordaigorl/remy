@@ -67,8 +67,6 @@ class Actions:
     self.dismissErrors = QAction('Dismiss all errors', parent)
     self.dismissErrors.setIcon(QIcon(":assets/16/clear-all.svg"))
     #
-    self.test = QAction('Test', parent)
-    #
     self.browse = QAction('Browse folders')
     self.browse.setIcon(QIcon(":assets/16/browser.svg"))
     self.browse.setCheckable(True)
@@ -179,8 +177,6 @@ class Actions:
       self.SEPARATOR,
       self.upload,
       self.export,
-      # self.SEPARATOR,
-      # self.test,
     ]
 
   def actionsDict(self):
@@ -290,7 +286,6 @@ class FileBrowser(QMainWindow):
     a.rename.triggered.connect(self.editCurrent)
     a.addToPinned.triggered.connect(self.pinSelected)
     a.remFromPinned.triggered.connect(self.unpinSelected)
-    a.test.triggered.connect(self.test)
     a.upload.triggered.connect(self.uploadIntoCurrentEntry)
     a.delete.triggered.connect(self.deleteSelected)
     a.listsGroup.triggered.connect(self.selectView)
@@ -376,12 +371,6 @@ class FileBrowser(QMainWindow):
         menu.addSeparator()
         sep = False
     menu.popup(self.tree.mapToGlobal(event.pos()))
-
-  @pyqtSlot()
-  def test(self):
-    item = self.tree.currentItem() or self.tree.invisibleRootItem()
-    p = self.tree.currentEntry()
-    TestWorker(self.index, parent=p.uid, visibleName="Test Note").start()
 
   @pyqtSlot()
   def openSelected(self):

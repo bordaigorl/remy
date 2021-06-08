@@ -173,7 +173,6 @@ class RemyApp(QApplication):
       mbox.addButton(QMessageBox.Retry)
       mbox.setDefaultButton(QMessageBox.Retry)
     answer = mbox.exec()
-    log.info(answer)
     if answer == QMessageBox.Retry:
       self.requestInit()
     elif answer == QMessageBox.Cancel:

@@ -242,7 +242,6 @@ class InfoPanel(QWidget):
         self.icon.setPixmap(QPixmap(":assets/128/epub.svg"))
       else:
         self._drops(False)
-        print(entry)
         self.title.setText("Unknown item")
 
       if entry.uid in self.thumbs:
