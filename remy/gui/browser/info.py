@@ -9,6 +9,8 @@ import remy.gui.resources
 import logging
 log = logging.getLogger('remy')
 
+THUMB_HEIGHT = 150
+
 
 class DropBox(QLabel):
 
@@ -165,10 +167,11 @@ class InfoPanel(QWidget):
     icon.setAlignment(Qt.AlignCenter)
     title.setTextInteractionFlags(Qt.TextSelectableByMouse)
     title.setWordWrap(True)
-    title.setText("Click on item to see metadata")
+    self.setDefaultInfo(title="Click on item to see metadata")
     # title.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Minimum)
     # title.setMaximumWidth(self.window().width() * .4)
     self.setLayout(layout)
+    self.setEntry()
 
 
   @pyqtSlot(list,list)
@@ -182,18 +185,41 @@ class InfoPanel(QWidget):
       else:
         self.drop.accepting()
 
-
   def _resetDetails(self):
     while self.details.rowCount() > 0:
       self.details.removeRow(0)
 
+  def setIcon(self, pixmap):
+    self.icon.setPixmap(pixmap)
+    m = (THUMB_HEIGHT-pixmap.height()) / 2
+    self.icon.setContentsMargins(0, m, 0, m)
+
   @pyqtSlot(str,QImage)
   def _onThumb(self, uid, img):
     self.thumbs[uid] = img
-    if uid == self.entry.uid:
-      self.icon.setPixmap(QPixmap.fromImage(img))
+    if self.entry and uid == self.entry.uid:
+      self.setIcon(QPixmap.fromImage(img))
 
-  def setEntry(self, entry):
+  def setDefaultInfo(self, **kw):
+    self._defaults = kw
+
+  def setInfo(self, title="", icon=None, details=[]):
+    self._resetDetails()
+    self.title.setText(title)
+    if icon is None:
+      self.setIcon(QPixmap())
+    elif isinstance(icon, str):
+      self.setIcon(QPixmap(":assets/128/%s.svg" % icon))
+    else:
+      self.setIcon(icon)
+    for (name, detail) in details:
+      self.details.addRow(name, detail)
+
+  def setEntry(self, entry=None):
+    if entry is None:
+      self.setInfo(**self._defaults)
+      self.entry = None
+      return
     if not isinstance(entry, Entry):
       entry = self.index.get(entry)
     self.entry = entry
@@ -217,37 +243,37 @@ class InfoPanel(QWidget):
       self._drops(True)
       self.title.setText(self.rootName or "Home")
       if entry.fsource.isReadOnly():
-        self.icon.setPixmap(QPixmap(":assets/128/backup.svg"))
+        self.setIcon(QPixmap(":assets/128/backup.svg"))
       else:
-        self.icon.setPixmap(QPixmap(":assets/128/tablet.svg"))
+        self.setIcon(QPixmap(":assets/128/tablet.svg"))
     elif isinstance(entry, TrashBin):
       self._drops(False)
       self.title.setText("Trash")
-      self.icon.setPixmap(QPixmap(":assets/128/trash.svg"))
+      self.setIcon(QPixmap(":assets/128/trash.svg"))
     elif isinstance(entry, Folder):
       self._drops(True)
       self.title.setText(entry.visibleName)
-      self.icon.setPixmap(QPixmap(":assets/128/folder-open.svg"))
+      self.setIcon(QPixmap(":assets/128/folder-open.svg"))
     else:
       self.title.setText(entry.visibleName)
       if isinstance(entry, PDFDoc):
         # self._drops(True, False, 'replace')
         self._drops(False)
-        self.icon.setPixmap(QPixmap(":assets/128/pdf.svg"))
+        self.setIcon(QPixmap(":assets/128/pdf.svg"))
       elif isinstance(entry, Notebook):
         self._drops(False)
-        self.icon.setPixmap(QPixmap(":assets/128/notebook.svg"))
+        self.setIcon(QPixmap(":assets/128/notebook.svg"))
       elif isinstance(entry, EBook):
         self._drops(False)
-        self.icon.setPixmap(QPixmap(":assets/128/epub.svg"))
+        self.setIcon(QPixmap(":assets/128/epub.svg"))
       else:
         self._drops(False)
         self.title.setText("Unknown item")
 
       if entry.uid in self.thumbs:
-        self.icon.setPixmap(QPixmap.fromImage(self.thumbs[entry.uid]))
+        self.setIcon(QPixmap.fromImage(self.thumbs[entry.uid]))
       else:
-        tgen = ThumbnailWorker(self.index, entry.uid)
+        tgen = ThumbnailWorker(self.index, entry.uid, THUMB_HEIGHT)
         tgen.signals.thumbReady.connect(self._onThumb)
         QThreadPool.globalInstance().start(tgen)
 
