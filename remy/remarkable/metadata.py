@@ -78,6 +78,9 @@ class Entry:
   def _postInit(self):
     pass
 
+  def isRoot(self):
+    return False
+
   def name(self):
     return self._metadata.get('visibleName')
 
@@ -164,9 +167,6 @@ class Folder(Entry):
       return self._content[field]
     else:
       return default
-
-  def isRoot(self):
-    return False
 
   def typeName(self):
     return "folder"
