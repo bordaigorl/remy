@@ -208,11 +208,14 @@ class FileBrowser(QMainWindow):
     #   info.setText(cur.internalPointer())
 
     tree.itemActivated.connect(self.openEntry)
-    tree.currentItemChanged.connect(self.entrySelected)
+    tree.currentItemChanged.connect(self.treeCurrentChanged)
+    self.tree.itemSelectionChanged.connect(self.selectionChanged)
     tree.contextMenu.connect(self.contextMenu)
     # tree.selectionCleared.connect(self.selClear)
 
-    results.selected.connect(self.resultSelected)
+    # results.selected.connect(self.resultSelected)
+    results.selected.connect(self.selectionChanged)
+    # results.selected.connect(self.treeCurrentChanged)
     results.activated.connect(self.resultActivated)
 
     self.viewers = {}
@@ -257,6 +260,7 @@ class FileBrowser(QMainWindow):
       elif sep:
         tb.addSeparator()
         sep = False
+
     tb.setIconSize(QSize(16,16))
     tb.setFloatable(False)
     tb.setMovable(False)
@@ -271,10 +275,10 @@ class FileBrowser(QMainWindow):
 
     splitter.setCollapsible(1,True)
 
-    rootitem = self.tree.invisibleRootItem()
-    self.tree.setCurrentItem(rootitem)
-    self.entrySelected(rootitem,rootitem)
+    # rootitem = self.tree.invisibleRootItem()
+    # self.tree.setCurrentItem(rootitem)
     self.selectView(self.actions.browse)
+    self.treeCurrentChanged()
 
 
   def _connectActions(self):
@@ -289,40 +293,58 @@ class FileBrowser(QMainWindow):
     a.upload.triggered.connect(self.uploadIntoCurrentEntry)
     a.delete.triggered.connect(self.deleteSelected)
     a.listsGroup.triggered.connect(self.selectView)
-    self.tree.itemSelectionChanged.connect(self.selectionChanged)
 
+  # this has to handle selection better:
+  #   selection on results should not trigger selection on tree
+  #   selection on results should set info as well
+  #   when changing view either clearSelection or bring seletion to new view
   @pyqtSlot(QAction)
   def selectView(self, which):
     which.setChecked(True)
     if which is self.actions.browse:
-      self.lastView = which
-      self.results.setQuery(None)
-      self.results.showDeleted(False)
-      self.results.showPinnedOnly(False)
-      self.results.showAllTypes()
-      self.stack.setCurrentWidget(self.tree)
+      if self.currentView() is not self.tree:
+        self.lastView = which
+        self.results.setQuery(None)
+        self.results.showDeleted(False)
+        self.results.showPinnedOnly(False)
+        self.results.showAllTypes()
+        self.stack.setCurrentWidget(self.tree)
+        e = self.results.currentEntry()
+        if e:
+          self.tree.setCurrentItem(self.tree.itemOf(e))
+        else:
+          self.tree.setCurrentItem(None)
     else:
-      self.tree.clearSelection()
       if which is not self.actions.listResults:
         self.lastView = which
-        # self.searchBar.clear()
         self.results.showDeleted(False)
         self.results.showPinnedOnly(False)
         self.results.setQuery(None)
       if which is self.actions.listPdfs:
         self.results.showOnlyType("pdf")
+        self.info.setDefaultInfo(title="PDFs", icon="pdf")
       elif which is self.actions.listEpubs:
         self.results.showOnlyType("epub")
+        self.info.setDefaultInfo(title="EPUBs", icon="epub")
       elif which is self.actions.listNotebooks:
         self.results.showOnlyType("notebook")
+        self.info.setDefaultInfo(title="Notebooks", icon="notebook")
       elif which is self.actions.listPinned:
         self.results.showAllTypes()
         self.results.showPinnedOnly(True)
+        self.info.setDefaultInfo(title="Favourites", icon="starred")
       self.stack.setCurrentWidget(self.results)
+      self.results.clearSelection()
+
+  def currentView(self):
+    return self.stack.currentWidget()
 
   @pyqtSlot()
   def selectionChanged(self):
-    self.actions.enableAccordingToSelection([i.entry() for i in self.tree.selectedItems()], self.tree.hasPendingItems())
+    v = self.currentView()
+    self.actions.enableAccordingToSelection(v.selectedEntries(), v.hasPendingItems())
+    self.info.setEntry(v.currentEntry())
+
 
   @pyqtSlot(QTreeWidgetItem, int)
   def itemChanged(self, item, col):
@@ -349,39 +371,38 @@ class FileBrowser(QMainWindow):
   #   print(self.tree.currentItem())
   #   self.info.setEntry(self.index.root())
 
-  @pyqtSlot(QTreeWidgetItem,QTreeWidgetItem)
-  def entrySelected(self, cur, prev):
-    entry = self.tree.currentEntry()
-    if entry:
-      self.info.setEntry(entry)
+  # @pyqtSlot(QTreeWidgetItem,QTreeWidgetItem)
+  def treeCurrentChanged(self, cur=None, prev=None):
+    curr = self.tree.currentEntry()
+    log.debug("CH %s %s", curr, curr.isRoot() if curr else False)
+    if curr and curr.isRoot():
+      self.info.setEntry(curr)
 
-  @pyqtSlot(QTreeWidgetItem,QContextMenuEvent)
+  # @pyqtSlot(QTreeWidgetItem,QContextMenuEvent)
   def contextMenu(self, item, event):
-    items = self.tree.selectedItems()
     actions = self.actions
     # actions.enableAccordingToSelection(sel, pending)
     menu = QMenu(self)
-    sep = True
+    # maybe merge in the currentView().actions() too!
     for a in actions.ctxtMenuActions():
       if a != Actions.SEPARATOR:
         if a.isEnabled():
           menu.addAction(a)
-          sep = True
       else:#if sep:
         menu.addSeparator()
-        sep = False
-    menu.popup(self.tree.mapToGlobal(event.pos()))
+    menu.popup(self.currentView().mapToGlobal(event.pos()))
 
   @pyqtSlot()
   def openSelected(self):
     # item = self.tree.currentItem()
-    for item in self.tree.selectedItems():
-      self.openEntry(item)
+    for e in self.currentView().selectedEntries():
+      self.openEntry(e)
 
-  @pyqtSlot(QTreeWidgetItem,int)
-  def openEntry(self, item, col=0):
-    if item and item.entry():
-      uid = item.entry().uid
+  def openEntry(self, entry, col=0):
+    if isinstance(entry, DocTreeItem):
+      entry = entry.entry()
+    if entry:
+      uid = entry.uid
       index = self.index
       if not index.isOfType(uid, FOLDER):
         if uid not in self.viewers:
@@ -400,13 +421,15 @@ class FileBrowser(QMainWindow):
 
   @pyqtSlot()
   def editCurrent(self):
+    if self.currentView() is not self.tree:
+      self.selectView(self.actions.browse)
     item = self.tree.currentItem()
     if item:
       self.tree.editItem(item)
 
   @pyqtSlot()
   def uploadIntoCurrentEntry(self):
-    entry = self.tree.currentEntry()
+    entry = self.currentView().currentEntry()
     if entry and not entry.index.isReadOnly():
       filenames, ok = QFileDialog.getOpenFileNames(self, "Select files to import")
       if ok and filenames:
@@ -414,7 +437,7 @@ class FileBrowser(QMainWindow):
 
   @pyqtSlot()
   def newFolder(self):
-    entry = self.tree.currentEntry()
+    entry = self.currentView().currentEntry()
     if entry and not entry.index.isReadOnly():
       if not entry.isFolder():
         entry = entry.parentEntry()
@@ -457,21 +480,20 @@ class FileBrowser(QMainWindow):
         Worker(self.index.newFolderWith, [ e.uid for e in entries], parent=parent.uid, visibleName=name).start()
 
 
-  def resultSelected(self, item):
-    uid = self.results.uidOfItem(item)
-    self.tree.setCurrentItem(self.tree.itemOf(uid))
+  # def resultSelected(self, item):
+  #   uid = self.results.uidOfItem(item)
+  #   # self.tree.setCurrentItem(self.tree.itemOf(uid))
 
 
   def resultActivated(self, item):
     if not isinstance(item, QModelIndex):
       item = self.results.currentIndex()
     uid = self.results.uidOfItem(item)
+    self.selectView(self.actions.browse)
     self.tree.setCurrentItem(self.tree.itemOf(uid))
-    self.searchBar.clear()
+    # self.searchBar.clear()
 
 
-  # This logic is not working well.
-  # Probably better idea is to save which view was last when triggering search
   @pyqtSlot(str)
   def searchQueryEdited(self, txt):
     self.results.setQuery(txt)
@@ -479,7 +501,9 @@ class FileBrowser(QMainWindow):
   @pyqtSlot(str)
   def searchQueryChanged(self, txt):
     self.searchBar.setQuery(txt)
+    currView = self.actions.listsGroup.checkedAction()
     if txt:
-      self.selectView(self.actions.listResults)
-    elif self.actions.listsGroup.checkedAction() is self.actions.listResults:
+      if currView is not self.actions.listResults:
+        self.selectView(self.actions.listResults)
+    elif currView is not self.lastView:  #self.actions.listResults:
       self.selectView(self.lastView)

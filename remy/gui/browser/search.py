@@ -163,7 +163,12 @@ class FlatRemarkableIndexModel(QAbstractTableModel):
                      [Qt.ToolTipRole, Qt.ForegroundRole, Qt.UserRole + 1,
                       Qt.UserRole + 2, Qt.UserRole + 3, Qt.DisplayRole])
 
+  def entryFromIndex(self, index):
+    if index.isValid():
+      return self._index.get(self._uids[index.row()])
 
+  def entryOf(self, uid):
+    return self._index.get(uid)
 
 
 class SearchResults(QTreeView):
@@ -176,6 +181,7 @@ class SearchResults(QTreeView):
     QTreeView.__init__(self, parent=parent)
     self._index_model = FlatRemarkableIndexModel(index)
     self.setModel(self._index_model.proxy())
+    self._query = None
     # self.setWindowFlags(Qt.FramelessWindowHint | Qt.Tool);
     # self.setAttribute(Qt.WA_ShowWithoutActivating)
     self.setIconSize(QSize(24,24))
@@ -246,9 +252,13 @@ class SearchResults(QTreeView):
   def optionsMenu(self):
     return self._optionsMenu
 
-  def setQuery(self, txt):
-    self._index_model.filterName(txt)
-    self.queryChanged.emit(txt)
+  def setQuery(self, txt=None):
+    if not txt: txt = None
+    if self._query != txt:
+      log.debug("Setting query %s", txt)
+      self._query = txt
+      self._index_model.filterName(txt)
+      self.queryChanged.emit(txt)
 
   def showDeleted(self, b):
     self._index_model.filterTrash(not b)
@@ -258,7 +268,6 @@ class SearchResults(QTreeView):
     self._index_model.filterPinned(b)
 
   def setCaseSensitivity(self, b):
-    log.debug("%s", b)
     self._index_model.setCaseSensitivity(b)
     self._caseToggle.setChecked(b)
 
@@ -288,8 +297,48 @@ class SearchResults(QTreeView):
     self._folderToggle.setChecked("folder" in self.entryTypes)
     self._notebookToggle.setChecked("notebook" in self.entryTypes)
 
-  def currentChanged(self, curr, prev):
-    self.selected.emit(curr)
+  def selectionChanged(self, sel, desel):
+    QTreeView.selectionChanged(self, sel, desel)
+    log.debug("SEARCH SEL: %d", len(self.selectedIndexes()))
+    sel = self.selectedIndexes()
+    if len(sel) > 0:
+      self.selected.emit(sel[0])
+    else:
+      self.selected.emit(QModelIndex())
+
+  @pyqtSlot()
+  def clearSelection(self):
+    QTreeView.clearSelection(self)
+    self.setCurrentIndex(QModelIndex())
+    self.selected.emit(QModelIndex())
+
+  def mouseReleaseEvent(self, event):
+    i = self.indexAt(event.pos())
+    QTreeView.mouseReleaseEvent(self, event)
+    if not i.isValid():
+      self.setCurrentIndex(QModelIndex())
+
+  # def currentChanged(self, curr, prev):
+  #   QTreeView.currentChanged(self, curr, prev)
+  #   log.debug("SEARCH CURR: %s -> %s", prev.row(),curr.row())
+  #   self.selected.emit(curr)
+
+  def currentEntry(self):
+    sel = self.selectedIndexes()
+    if len(sel) > 0:
+      i = sel[0]
+      if i.isValid():
+        return self._index_model.entryOf(self.model().data(i, Qt.UserRole))
+    return None
+
+  def selectedEntries(self):
+    # just because of the selection mode
+    e = self.currentEntry()
+    return [e] if e else []
+
+  def hasPendingItems(self):
+    return False
+
 
 
 class SearchBar(QWidget):

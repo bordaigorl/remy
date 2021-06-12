@@ -136,7 +136,7 @@ class DocTreeItem(QTreeWidgetItem):
     msg = ""
     for m in self._messages:
       msg += '\n' + m[0].upper() + ': ' + m[1]
-    log.debug(msg)
+    log.debug('MSG: %s', msg)
     if msg:
       QMessageBox.information(self.treeWidget().window(), "Log", msg)
     self._messages.clear()
@@ -324,6 +324,9 @@ class DocTree(QTreeWidget):
       return cur.entry()
     else:
       return None
+
+  def selectedEntries(self):
+    return [i.entry() for i in self.selectedItems()]
 
   def mouseReleaseEvent(self, event):
     i = self.indexAt(event.pos())
