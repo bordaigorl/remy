@@ -366,8 +366,12 @@ class DocTree(QTreeWidget):
   def newEntryComplete(self, uid, etype, meta, path):
     self._nodes[uid] = i = self._pending_item[uid]
     del self._pending_item[uid]
-    i.setEntry(self.index.get(uid))
-    i.idle()
+    entry = self.index.get(uid)
+    i.setEntry(entry)
+    if entry.shouldHaveBaseDocument() and not entry.hasBaseDocument():
+      i.warning("You will need to open this document on the tablet before being able to properly preview its contents in Remy.")
+    else:
+      i.idle()
 
   @pyqtSlot(Exception, str, int, dict, Path)
   def newEntryError(self, exception, uid, etype, meta, path=None):
