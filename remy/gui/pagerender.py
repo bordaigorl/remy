@@ -27,6 +27,9 @@ except Exception:
 def dynamic_width(segment):
   return (segment.width,None)
 
+def semi_dynamic_width(segment):
+  return (round(segment.width),None)
+
 def very_dynamic_width(segment):
   return (round((segment.width *.7) + (segment.width * .3 * segment.pressure),2),None)
 
@@ -43,7 +46,7 @@ def flat_mech_pencil_width(segment):
   return (round(segment.width/1.5,2),round(segment.pressure, 2))
 
 def const_width(w):
-    return lambda stroke, segment: (w,None)
+    return lambda segment: (w,None)
 
 def _progress(p, i, t):
   if callable(p):
@@ -238,8 +241,9 @@ class PageGraphicsItem(QGraphicsRectItem):
             calcwidth = mech_pencil_width
           else:
             calcwidth = flat_mech_pencil_width
-        # elif tool == rm.BALLPOINT_TOOL:
-        #   calcwidth = very_dynamic_width
+        elif tool == rm.BALLPOINT_TOOL:
+          calcwidth = semi_dynamic_width
+          # calcwidth = const_width(k.width)
         else:
           calcwidth = dynamic_width
 
