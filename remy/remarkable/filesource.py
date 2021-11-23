@@ -474,7 +474,7 @@ class LiveFileSourceRsync(LiveFileSourceSSH):
       filename = filename[:-1] + (filename[-1] + '.' + ext,)
     local = self._local(*filename)
     with self._lock:
-      if not (path.isfile(local) and local in self._updated):
+      if force or not (path.isfile(local) and local in self._updated):
         if not self._isfile(self._remote(*filename)):
           return None
         self._file_download(self._remote(*filename), local)

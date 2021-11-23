@@ -223,14 +223,14 @@ class TrashBin(Folder):
 
 class Document(Entry):
 
-  def getPage(self, pageNum):
+  def getPage(self, pageNum, force=False):
     pages = self.pages
     try:
       if pages is None:
         pid = str(pageNum)
       else:
         pid = pages[pageNum]
-      rmfile = self.fsource.retrieve(self.uid, pid, ext='rm')
+      rmfile = self.fsource.retrieve(self.uid, pid, ext='rm', force=force)
       with open(rmfile, 'rb') as f:
         (ver, layers) = readLines(f)
     except:
