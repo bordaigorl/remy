@@ -969,3 +969,8 @@ class RemarkableIndex:
       for uid in uids:
         self.update(uid, parent=fuid)
 
+  def moveAll(self, uids, parent):
+    with self._upd_lock:
+      for uid in uids:
+        self.update(uid, parent=parent)
+
