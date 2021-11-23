@@ -225,7 +225,7 @@ class FileBrowser(QMainWindow):
     self.setWindowTitle("Remy")
     self.show()
     dg = QApplication.desktop().availableGeometry(self)
-    self.resize(dg.size() * 0.5)
+    self.resize(dg.size() * 0.7)
     fg = self.frameGeometry()
     fg.moveCenter(dg.center())
     self.move(fg.topLeft())
