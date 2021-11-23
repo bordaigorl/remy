@@ -64,7 +64,7 @@ class RemyApp(QApplication):
         source, ok = self.sourceSelectionBox()
         if not ok:
           log.error("Sorry, I need a source to work.")
-          sys.exit(2)
+          sys.exit()
       config.selectSource(source)
 
     self.aboutToQuit.connect(self.cleanup)

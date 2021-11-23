@@ -238,6 +238,8 @@ class Exporter(QThread):
 
       ranges = [range(*s.indices(totPages)) for s in self.whichPages]
       steps = sum(len(r) for r in ranges)
+      if steps == 0:
+        raise Exception("No pages to export!")
       if pdf:
         self.onStart.emit(steps * 3 + 1)
       else:

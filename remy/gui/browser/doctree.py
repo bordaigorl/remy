@@ -179,7 +179,7 @@ class DocTreeItem(QTreeWidgetItem):
     icon = self.treeWidget()._icon
     self.setData(0, Qt.UserRole, entry.uid)
     flags = Qt.ItemIsEnabled | Qt.ItemIsSelectable
-    # commented flag settings should be uncommented once move/rename are implemented
+    # commented flag settings should be uncommented once move is implemented
     if isinstance(entry, Document):
       flags |= Qt.ItemNeverHasChildren #| Qt.ItemIsDragEnabled
       if not entry.index.isReadOnly() and not entry.isDeleted():
@@ -196,6 +196,9 @@ class DocTreeItem(QTreeWidgetItem):
         self.setText(3, "EBook")
       self.setText(1, entry.updatedOn())
       self.setText(2, "1" if entry.pinned else "")
+      if entry.shouldHaveBaseDocument() and not entry.hasBaseDocument():
+        self.warning("You will need to open this document on the tablet "
+                     "before being able to properly preview its contents in Remy.")
     elif isinstance(entry, TrashBin):
       flags = Qt.ItemIsEnabled
       # flags |= Qt.ItemIsDropEnabled
@@ -368,10 +371,7 @@ class DocTree(QTreeWidget):
     del self._pending_item[uid]
     entry = self.index.get(uid)
     i.setEntry(entry)
-    if entry.shouldHaveBaseDocument() and not entry.hasBaseDocument():
-      i.warning("You will need to open this document on the tablet before being able to properly preview its contents in Remy.")
-    else:
-      i.idle()
+    i.idle()
 
   @pyqtSlot(Exception, str, int, dict, Path)
   def newEntryError(self, exception, uid, etype, meta, path=None):
