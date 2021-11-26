@@ -27,6 +27,9 @@ class Actions:
     # if all non folders
     self.preview = QAction('Open in viewer', parent)
     self.preview.setShortcut("Ctrl+Enter")
+    # if single pdf
+    self.openBaseDoc = QAction('Open base document', parent)
+    self.openBaseDoc.setShortcut("Ctrl+Shift+Enter")
     #
     # if all non folders (for now)
     self.export = QAction('Export...', parent)
@@ -56,6 +59,8 @@ class Actions:
     # non root
     self.newFolderWith = QAction('New Folder with Selection', parent)
     self.newFolderWith.setIcon(QIcon(":assets/16/folder-with.svg"))
+    self.moveTo = QAction('Move to…', parent)
+    self.moveTo.setIcon(QIcon(":assets/symbolic/folder.svg"))
     #
     # non root
     self.delete = QAction('Move to Trash', parent)
@@ -126,6 +131,8 @@ class Actions:
       anyUnpinned = anyUnpinned or (e.pinned == False)
       anyDeleted = anyDeleted or e.isIndirectlyDeleted()
     self.preview.setEnabled(not (empty or anyFolders))
+    self.openBaseDoc.setVisible(singleSel and isinstance(e, Document))
+    self.openBaseDoc.setEnabled(singleSel and isinstance(e, Document) and e.hasBaseDocument())
     # self.export.setEnabled(not (empty or anyFolders)) # once implemented
     self.export.setEnabled(singleSel and not anyFolders)
     self.upload.setEnabled(singleSel and allFolders and not anyDeleted)
@@ -165,6 +172,7 @@ class Actions:
   def ctxtMenuActions(self):
     return [
       self.preview,
+      self.openBaseDoc,
       self.SEPARATOR,
       self.newFolder,
       self.newFolderWith,
@@ -242,6 +250,7 @@ class FileBrowser(QMainWindow):
     act.triggered.connect(self.resultActivated)
     results.addAction(act)
     results.addAction(self.actions.preview)
+    results.addAction(self.actions.openBaseDoc)
     results.addAction(self.actions.export)
     results.queryChanged.connect(self.searchQueryChanged)
 
@@ -284,6 +293,7 @@ class FileBrowser(QMainWindow):
   def _connectActions(self):
     a = self.actions
     a.preview.triggered.connect(self.openSelected)
+    a.openBaseDoc.triggered.connect(self.openBaseDoc)
     a.export.triggered.connect(self.exportSelected)
     a.newFolder.triggered.connect(self.newFolder)
     a.newFolderWith.triggered.connect(self.newFolderWith)
@@ -397,6 +407,14 @@ class FileBrowser(QMainWindow):
     # item = self.tree.currentItem()
     for e in self.currentView().selectedEntries():
       self.openEntry(e)
+
+  @pyqtSlot()
+  def openBaseDoc(self):
+    # item = self.tree.currentItem()
+    for e in self.currentView().selectedEntries():
+      filename = e.retrieveBaseDocument()
+      log.info("%s", filename)
+      QDesktopServices.openUrl(QUrl("file://" + filename))
 
   def openEntry(self, entry, col=0):
     if isinstance(entry, DocTreeItem):
