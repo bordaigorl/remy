@@ -135,11 +135,11 @@ class Actions:
     self.openBaseDoc.setEnabled(singleSel and isinstance(e, Document) and e.hasBaseDocument())
     # self.export.setEnabled(not (empty or anyFolders)) # once implemented
     self.export.setEnabled(singleSel and not anyFolders)
-    self.upload.setEnabled(singleSel and allFolders and not anyDeleted)
+    self.upload.setEnabled(empty or (singleSel and allFolders and not anyDeleted))
     self.rename.setEnabled(singleSel)
     self.addToPinned.setEnabled(anyUnpinned and not anyDeleted)
     self.remFromPinned.setEnabled(anyPinned and not anyDeleted)
-    self.newFolder.setEnabled(singleSel and not anyDeleted)
+    self.newFolder.setEnabled((singleSel and not anyDeleted) or empty)
     self.newFolderWith.setEnabled(not (empty or anyDeleted))
     self.delete.setEnabled(not (empty or anyDeleted))
     self.cancelPending.setVisible(pending)
