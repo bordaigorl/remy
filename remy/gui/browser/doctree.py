@@ -397,9 +397,11 @@ class DocTree(QTreeWidget):
       item.setEntry(entry)
       if 'parent' in new_meta:
         p = self._nodes.get(entry.parent)
-        i = item.parent().indexOfChild(item)
+        pi = item.parent()
+        if pi is None: pi = self.invisibleRootItem()
+        i = pi.indexOfChild(item)
         if p is not None and i:
-          item = item.parent().takeChild(i)
+          item = pi.takeChild(i)
           p.addChild(item)
         else:
           item.warning("Could not move to new parent folder. Try restarting Remy.")
