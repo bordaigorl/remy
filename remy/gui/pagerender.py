@@ -390,6 +390,7 @@ class ThumbnailWorker(QRunnable):
     self.signals = ThumbnailSignal()
 
   def run(self):
+    painter = None
     try:
       d = self.index.get(self.uid)
       log.debug("Generating thumb for %s", d.name())
@@ -436,4 +437,5 @@ class ThumbnailWorker(QRunnable):
     except Exception as e:
       log.warning("Could not create thumbnail for %s [%s]", self.uid, e)
     finally:
-      painter.end()
+      if painter:
+        painter.end()
