@@ -13,7 +13,7 @@ from PyPDF2.utils import PdfReadError
 from PyPDF2.generic import NullObject
 
 from remy.remarkable.metadata import PDFBasedDoc
-from remy.gui.pagerender import BarePageScene, DEFAULT_COLORS, DEFAULT_HIGHLIGHT
+from remy.gui.pagerender import BarePageScene, DEFAULT_COLORS, DEFAULT_HIGHLIGHT, ALPHA_HIGHLIGHT
 
 from os import path
 import time
@@ -205,6 +205,10 @@ class Exporter(QThread):
       whichPages = parsePageRanges(whichPages, document)
     self.whichPages = whichPages
     self.options    = options
+    # we are disabling highlight customisation for the moment
+    # and using opacity instead of 'darken' composition mode
+    # since the latter is not supported by the PDF export of Qt
+    self.options['highlight'] = ALPHA_HIGHLIGHT
 
   def cancel(self):
     self._cancel = True
@@ -484,11 +488,11 @@ class ExportDialog(QDialog):
     self.black = self.ColorButton("Black", options=QColorDialog.ShowAlphaChannel)
     self.gray = self.ColorButton("Gray", options=QColorDialog.ShowAlphaChannel)
     self.white = self.ColorButton("White", options=QColorDialog.ShowAlphaChannel)
-    self.highlight = self.ColorButton("Highlight", options=QColorDialog.ShowAlphaChannel)
+    # self.highlight = self.ColorButton("Highlight", options=QColorDialog.ShowAlphaChannel)
     colorsel.addWidget(self.black, 0, 0)
     colorsel.addWidget(self.gray, 0, 1)
     colorsel.addWidget(self.white, 1, 0)
-    colorsel.addWidget(self.highlight, 1, 1)
+    # colorsel.addWidget(self.highlight, 1, 1)
     form.addRow("Colors:", colorsel)
 
     # pencilRes = self.pencilRes = QDoubleSpinBox()
@@ -555,7 +559,7 @@ class ExportDialog(QDialog):
     self.black.setColor(QColor(colors.get("black", DEFAULT_COLORS[0])))
     self.gray.setColor(QColor(colors.get("gray", DEFAULT_COLORS[1])))
     self.white.setColor(QColor(colors.get("white", DEFAULT_COLORS[2])))
-    self.highlight.setColor(QColor(colors.get("highlight", DEFAULT_HIGHLIGHT)))
+    # self.highlight.setColor(QColor(colors.get("highlight", DEFAULT_HIGHLIGHT)))
     # self.pencilRes.setValue(self.options.get("pencil_resolution", 0.4))
 
     pmi = self.pencilMode.findData(self.options.get("pencil_resolution", 1))
@@ -577,7 +581,7 @@ class ExportDialog(QDialog):
           'black': self.black.color(),
           'gray': self.gray.color(),
           'white': self.white.color(),
-          'highlight': self.highlight.color(),
+          # 'highlight': self.highlight.color(),
         },
         'exclude_layers': parseExcludeLayers(self.exclLayers.text()),
         'pencil_resolution': self.pencilMode.currentData(),

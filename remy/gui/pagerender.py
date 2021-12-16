@@ -53,6 +53,23 @@ def _progress(p, i, t):
     p(i, t)
 
 
+# Unfortunately, Qt's PDF export ignores composition modes
+# so this is only useful for rendering to screen :(
+class QGraphicsRectItemD(QGraphicsRectItem):
+
+  def paint(self, painter, sty, w):
+    painter.setCompositionMode(QPainter.CompositionMode_Darken)
+    QGraphicsRectItem.paint(self, painter, sty, w)
+
+
+class QGraphicsPathItemD(QGraphicsPathItem):
+
+  def paint(self, painter, sty, w):
+    painter.setCompositionMode(QPainter.CompositionMode_Darken)
+    QGraphicsPathItem.paint(self, painter, sty, w)
+
+
+
 class PencilBrushes():
 
   def __init__(self, N=15, size=200):
@@ -88,8 +105,25 @@ def pencilBrushes(**kw):
   return _pencilBrushes
 
 
-DEFAULT_COLORS = [Qt.black, QColor('#bbbbbb'), Qt.white]
-DEFAULT_HIGHLIGHT = QColor(255,235,147, 80)
+DEFAULT_COLORS = {
+  0: Qt.black,
+  1: QColor('#bbbbbb'),
+  2: Qt.white,
+  6: QColor('#0062cc'),
+  7: QColor('#d90707'),
+}
+DEFAULT_HIGHLIGHT = {
+  1: QColor(255,235,147),
+  3: QColor(254,253,96),
+  4: QColor(169,250,92),
+  5: QColor(255,85,207),
+}
+ALPHA_HIGHLIGHT = {
+  1: QColor(255,235,147, 127),
+  3: QColor(254,253,96, 127),
+  4: QColor(169,250,92, 127),
+  5: QColor(255,85,207, 127),
+}
 
 QUICK_ERASER    = 0
 IGNORE_ERASER   = 1
@@ -171,12 +205,16 @@ class PageGraphicsItem(QGraphicsRectItem):
     if isinstance(eraser_mode, str):
       eraser_mode = ERASER_MODE.get(eraser_mode, AUTO_ERASER)
     if isinstance(colors, dict):
-      highlight = colors.get('highlight', highlight)
-      colors = [
-        QColor(colors.get('black', DEFAULT_COLORS[0])),
-        QColor(colors.get('gray', DEFAULT_COLORS[1])),
-        QColor(colors.get('white', DEFAULT_COLORS[2])),
-      ]
+      # highlight = colors.get('highlight', highlight)
+      if not isinstance(highlight, dict):
+        highlight = {1: highlight, 3: highlight, 4: highlight, 5: highlight}
+      colors = {
+        0: QColor(colors.get('black', DEFAULT_COLORS[0])),
+        1: QColor(colors.get('gray', DEFAULT_COLORS[1])),
+        2: QColor(colors.get('white', DEFAULT_COLORS[2])),
+        6: QColor(colors.get('blue', DEFAULT_COLORS[6])),
+        7: QColor(colors.get('red', DEFAULT_COLORS[7])),
+      }
 
     if simpl is None:
       simplify = 0
@@ -208,10 +246,11 @@ class PageGraphicsItem(QGraphicsRectItem):
         h = QGraphicsRectItem(self)
         h.setPen(QPen(Qt.NoPen))
         for hi in l.highlights:
+          hcolor = hi.get('color', 1)
           for r in hi.get('rects', []):
-            ri = QGraphicsRectItem(r.get('x',0),r.get('y',0),r.get('width',0), r.get('height',0), h)
+            ri = QGraphicsRectItemD(r.get('x',0),r.get('y',0),r.get('width',0), r.get('height',0), h)
             ri.setPen(QPen(Qt.NoPen))
-            ri.setBrush(highlight)
+            ri.setBrush(highlight[hcolor])
             ri.setToolTip(hi.get('text',''))
       group = QGraphicsPathItem()
       group.setPen(noPen)
@@ -224,11 +263,14 @@ class PageGraphicsItem(QGraphicsRectItem):
 
         # COLOR
         if tool == rm.HIGHLIGHTER_TOOL:
-          pen.setColor(highlight)
+          pen.setColor(highlight[k.color])
         elif tool == rm.ERASER_TOOL:
           pen.setColor(Qt.white)
-        else:
+        elif k.color in colors:
           pen.setColor(colors[k.color])
+        else:
+          log.error("Tool %s Color %s not defined", rm.TOOL_NAME.get(tool, tool), k.color)
+          pen.setColor(Qt.red)
 
         # WIDTH CALCULATION
         if tool == rm.PENCIL_TOOL:
@@ -334,7 +376,12 @@ class PageGraphicsItem(QGraphicsRectItem):
                   pen.setBrush(pencilBrushes().getBrush(p, scale=pencil_resolution))
                 else:
                   pen.setColor(QColor(int(p*255),int(p*255),int(p*255)))
-              item=QGraphicsPathItem(path, group)
+              if tool == rm.HIGHLIGHTER_TOOL: # and k.color != 1:
+                # log.warn('Hello %s', k.color)
+                PathItem = QGraphicsPathItemD
+              else:
+                PathItem = QGraphicsPathItem
+              item=PathItem(path, group)
               item.setPen(pen)
               path = QPainterPath(path.currentPosition())
               path.setFillRule(Qt.WindingFill)
