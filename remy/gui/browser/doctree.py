@@ -24,7 +24,10 @@ DOCTYPE = {
   EPUB: 'epub'
 }
 
-
+def doctype_sortcode(t):
+  t = t[0].upper() if t else 'Z'
+  t = 'Q' if t == 'E' else t
+  return t
 
 class UploadingItem(QWidget):
 
@@ -215,7 +218,7 @@ class DocTreeItem(QTreeWidgetItem):
       self.setText(3, "Folder")
       self.setText(2, "1" if entry.pinned else "")
     self.setFlags(flags)
-    self._sortdata = self.text(3)[0] + self.text(0)
+    self._sortdata = doctype_sortcode(self.text(3)) + self.text(0)
 
   def entry(self):
     return self._entry
