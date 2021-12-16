@@ -190,7 +190,7 @@ class PageGraphicsItem(QGraphicsRectItem):
   def __init__(
       self,
       page,
-      colors=DEFAULT_COLORS,
+      colors=None,
       highlight=DEFAULT_HIGHLIGHT,
       pencil_resolution=.4,
       simplify=0,
@@ -205,9 +205,10 @@ class PageGraphicsItem(QGraphicsRectItem):
     if isinstance(eraser_mode, str):
       eraser_mode = ERASER_MODE.get(eraser_mode, AUTO_ERASER)
     if isinstance(colors, dict):
-      # highlight = colors.get('highlight', highlight)
-      if not isinstance(highlight, dict):
-        highlight = {1: highlight, 3: highlight, 4: highlight, 5: highlight}
+      if 'highlight' in colors:
+        highlight = colors['highlight']
+        if not isinstance(highlight, dict):
+          highlight = {1: highlight, 3: highlight, 4: highlight, 5: highlight}
       colors = {
         0: QColor(colors.get('black', DEFAULT_COLORS[0])),
         1: QColor(colors.get('gray', DEFAULT_COLORS[1])),
@@ -215,6 +216,8 @@ class PageGraphicsItem(QGraphicsRectItem):
         6: QColor(colors.get('blue', DEFAULT_COLORS[6])),
         7: QColor(colors.get('red', DEFAULT_COLORS[7])),
       }
+    else:
+      colors = DEFAULT_COLORS
 
     if simpl is None:
       simplify = 0
