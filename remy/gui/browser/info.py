@@ -191,7 +191,7 @@ class InfoPanel(QWidget):
 
   def setIcon(self, pixmap):
     self.icon.setPixmap(pixmap)
-    m = (THUMB_HEIGHT-pixmap.height()) / 2
+    m = int((THUMB_HEIGHT-pixmap.height()) / 2)
     self.icon.setContentsMargins(0, m, 0, m)
 
   @pyqtSlot(str,QImage)
