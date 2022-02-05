@@ -13,7 +13,7 @@ from PyPDF2.utils import PdfReadError
 from PyPDF2.generic import NullObject
 
 from remy.remarkable.metadata import PDFBasedDoc
-from remy.gui.pagerender import BarePageScene, DEFAULT_COLORS, DEFAULT_HIGHLIGHT, ALPHA_HIGHLIGHT
+from remy.remarkable.render import BarePageScene, DEFAULT_COLORS, DEFAULT_HIGHLIGHT, ALPHA_HIGHLIGHT
 
 from os import path
 import time

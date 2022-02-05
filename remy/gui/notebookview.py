@@ -8,7 +8,7 @@ from PyQt5.QtPrintSupport import *
 import remy.remarkable.constants as rm
 from remy.ocr.mathpix import mathpix
 
-from remy.gui.pagerender import PageGraphicsItem, BarePageScene
+from remy.remarkable.render import PageGraphicsItem, BarePageScene
 from remy.gui.export import webUIExport, exportDocument
 
 from os import path

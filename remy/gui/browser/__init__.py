@@ -3,7 +3,7 @@ from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 
 from remy.gui.qmetadata import *
-from remy.gui.pagerender import ThumbnailWorker
+from remy.gui.thumbnail import ThumbnailWorker
 import remy.gui.resources
 from remy.gui.notebookview import *
 
@@ -384,7 +384,6 @@ class FileBrowser(QMainWindow):
   # @pyqtSlot(QTreeWidgetItem,QTreeWidgetItem)
   def treeCurrentChanged(self, cur=None, prev=None):
     curr = self.tree.currentEntry()
-    log.debug("CH %s %s", curr, curr.isRoot() if curr else False)
     if curr and curr.isRoot():
       self.info.setEntry(curr)
 

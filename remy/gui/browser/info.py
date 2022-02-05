@@ -3,7 +3,7 @@ from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 
 from remy.gui.qmetadata import *
-from remy.gui.pagerender import ThumbnailWorker
+from remy.gui.thumbnail import ThumbnailWorker
 import remy.gui.resources
 
 import logging
