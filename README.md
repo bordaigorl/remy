@@ -67,6 +67,7 @@ Create a JSON file at that path with the following structure:
       ...
   },
   "default_source": "source1",
+  "palettes" : {...},
   "preview": {...},
   "export": {...},
   "mathpix" : {...}
@@ -157,29 +158,79 @@ The feature works best if the setting is the filename (can be absolute, or relat
 
 If Remy crashes and the remarkable seems unresponsive it is only because Remy re-enables the main UI of the tabled on exit; to regain control of the tablet you have three options: try and run Remy again and close it cleanly; or run `ssh REMARKABLEHOST /bin/systemctl start xochitl`; or manually reboot the device. Don't worry nothing bad is happening to the tablet in this circumstance.
 
+### Palettes section
+
+The `palettes` section is a dictionary of color palettes, for example:
+
+```json
+"palettes": {
+    "review": {
+        "black": "red",
+        "gray": "#009C26"
+    },
+    "grayscale": {
+        "black": "black",
+        "gray": "#bbbbbb",
+        "white": "white",
+        "blue": "#cccccc",
+        "red": "#dddddd",
+        "highlight": "#7fcccccc",
+        "yellow": "#7fcccccc",
+        "green": "#7fbbbbbb",
+        "pink": "#7fdddddd"
+    }
+}
+```
+
+There is always a `'default'` palette with the built-in choice of colors.
+You can overwrite it by redefining it in the `palettes` dictionary.
+All other palettes inherit the non-specified colors from the built-in defaults.
+
+The palettes defined in the section are used in two ways:
+
+- they are offered as options in the Export dialog
+- the defined names can be used as values of the `palette` setting in the `preview` and `export` sections.
+
+The color identifiers are `black`, `gray`, `white`, `blue`, and `red`,
+and for the highlighter colors they are `highlight` (for the old opacity-based highlighter) `yellow`, `green`, and `pink`.
+
+Currently it is not possible to change the pencil's color.
+
+
 ### Preview options
 
-The `preview` section for now has one option only: `eraser_mode`.
-It can take two values: `"accurate"` or `"quick"` (default is `"quick"`).
+The `preview` section for now has two options only: `eraser_mode` and `palette`.
+The `eraser_mode` option can take two values: `"accurate"` or `"quick"` (default is `"quick"`).
 The quick method paints white strokes to render the eraser tool.
 This results in quicker rendering times but inaccurate results: the layers below the strokes would be covered by the eraser which is undesirable.
 The export function always uses the accurate method: clipping the paths to exclude erased areas. Accurate mode is slower to render due to the clipping, so it is optional in preview mode.
 
+The `palette` option can take either the name of a palette defined in the `palettes` section, or be a dictionary with color definitions (as used in the `palettes` dictionary).
+
 ```json
 "preview": {
-  "eraser_mode": "quick"
+  "eraser_mode": "quick",
+  "palette": "grayscale"
 }
 ```
+
+
 ### Export options
 
-The export section has two settings:
+The export section has three settings:
 
 ```json
 "export": {
   "default_dir": "...",
-  "open_exported": true
+  "open_exported": true,
+  "palette": "review"
 }
 ```
+
+The `palette` option works in the same way as for the `preview` section,
+with the caveat that the highlighter colors will be rendered with opacity 50%
+since the PDF exporter of Qt5 does not support blend modes.
+
 
 ### Mathpix options
 
@@ -230,9 +281,6 @@ Planned features include: fully parametric rendering to be able to control the c
 ### Upload
 
 From the tree view, select a folder (or deselect to select the root) and drag and drop on the info panel any PDF (mutiple PDFs at once are supported, folders are planned but not supported yet).
-For the moment, the UI blocks until upload is completed.
-Progress bars coming soon ;)
-
 
 
 - - -
