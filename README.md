@@ -33,8 +33,11 @@ The requirements are:
 - paramiko
 - PyPDF2
 - PyQt5
-- simplification (this requires python < 3.9, but I plan to make this dependency optional)
 - python-poppler-qt5 (see below)
+
+Optional:
+
+- simplification (this requires python < 3.9, but I plan to make this dependency optional)
 
 The following works on MacOs (Catalina), assuming `python` version 3.8 (if not, use `pyenv` to install and manage Python versions):
 
@@ -197,38 +200,85 @@ and for the highlighter colors they are `highlight` (for the old opacity-based h
 Currently it is not possible to change the pencil's color.
 
 
+### Render options
+
+The `preview` and `export` sections can contain settings that affect the rendering (which we will group in the explanation as `RENDER_OPTIONS`).
+
+All these settings are optional.
+The `RENDER_OPTIONS` settings can set the following keys:
+
+- `palette`
+  can be set either to the name of a palette defined in the `palettes` section, or to a dictionary with color definitions (as used in the `palettes` dictionary).
+
+- `pencil_resolution`
+  can be set to a number indicating how much to scale the texture of pencil brushes. Bigger scale means coarser texture.
+  Default is `0.4`.
+  Due to limitations of Qt, the PDF export currently ignores this setting.
+
+- `simplify`
+  can be set to a number indicating a tolerance for the precision of strokes.
+  High tolerance means strokes will be more approximate.
+  Requires the `simplification` library.
+  Default is `0` (no simplification).
+  
+- `smoothen`
+  can be set to `true` or `false`. Default is `false`.
+  If set, the renderer would produce beziers interpolating the original strokes.
+  Can be used in combination with `simplify` to obtain smaller files with smooth lines.
+  The feature is still experimental.
+  
+- `eraser_mode`
+  can be set to either `"accurate"`, `"ignore"`, `"quick"`, or `"auto"`. Default is `"auto"`.
+
+  * The `"accurate"` method clips the paths so that the erased areas are see-through.
+    This incurs in expensive calculations and bigger files.
+    It makes a difference only when the eraser is used to carve out precise bits out of wide stroked areas.
+  * The `"ignore"` method gives generally the best tradeoff. It simply ignores the eraser strokes.
+    The tablet already removes from the file the strokes that were completely covered by eraser strokes.
+    The only inaccuracies come from strokes that were only partially covered.
+    For written notes or line art this is the best method.
+  * The `"quick"` method paints white strokes to render the eraser tool.
+    This results in quicker rendering times but inaccurate results:
+    the layers below the strokes would be covered by the eraser which is undesirable.
+  * `"auto"` will use `"ignore"` and automatically switch to `"accurate"` when the page contains strokes that may need the accurate method to be rendered precisely (e.g. with very wide strokes).
+  
+  
+- `exclude_layers`
+  can be set to a list of numbers between 1 and 5 indicating which layers to exclude from the rendering.
+
+- `orientation`
+  can be set to `auto`, `landscape` or `portrait`.
+
+- `include_base_layer`
+  can be set to `true` or `false`, determining whether the template/pdf/epub layer is to be included or not in the rendering.
+  Default is `true`.
+
+
 ### Preview options
 
-The `preview` section for now has two options only: `eraser_mode` and `palette`.
-The `eraser_mode` option can take two values: `"accurate"` or `"quick"` (default is `"quick"`).
-The quick method paints white strokes to render the eraser tool.
-This results in quicker rendering times but inaccurate results: the layers below the strokes would be covered by the eraser which is undesirable.
-The export function always uses the accurate method: clipping the paths to exclude erased areas. Accurate mode is slower to render due to the clipping, so it is optional in preview mode.
-
-The `palette` option can take either the name of a palette defined in the `palettes` section, or be a dictionary with color definitions (as used in the `palettes` dictionary).
+The preview section contains `RENDER_OPTIONS` determining how the previewer will render notebooks.
 
 ```json
 "preview": {
-  "eraser_mode": "quick",
-  "palette": "grayscale"
+  RENDER_OPTIONS
 }
 ```
 
 
 ### Export options
 
-The export section has three settings:
+The export section determines the defaults used for exporting notebooks to PDFs.
+In addition to `RENDER_OPTIONS` you can also set the `default_dir` and the `open_exported` settings
 
 ```json
 "export": {
-  "default_dir": "...",
+  "default_dir": "/path/to/folder",
   "open_exported": true,
-  "palette": "review"
+  RENDER_OPTIONS
 }
 ```
 
-The `palette` option works in the same way as for the `preview` section,
-with the caveat that the highlighter colors will be rendered with opacity 50%
+The highlighter colors will be rendered with opacity 50%
 since the PDF exporter of Qt5 does not support blend modes.
 
 
@@ -257,7 +307,7 @@ Once the configuration file contains the necessary info, you can run Remy by run
 The option is the id of one of the sources defined in the configuration file.
 With no option, the default source will be selected.
 
-The app displays the tree of the files in the main window.
+The app displays the tree of the files in the main window and allows to search by name/type.
 
 ### Preview
 
@@ -268,19 +318,30 @@ Pressing S increases the simplification of the lines, Shift+S decreases it (this
 
 ### Export and rendering
 
-PDFs are rendered at a fixed resolution for quick preview.
+PDFs are rendered in the previewer at a fixed resolution.
 The export function overlays the vectorial data from annotations to the original PDF so the quality of both is preserved.
 
 The rendering of notebooks/annotations has been redeveloped from scratch.
-It features proper handling of eraser/eraser area: other renderers just produce a white fill/stroke but that does not work well with layers nor with annotations on PDFs; for the moment this faster way of dealing with it is used for eraser in preview mode, but the accurate one is used for the export function.
-For the moment the export function simplifies the lines a bit, to achieve smaller sizes.
-This will become a fully customizable parameter once the tool matures.
+Features:
 
-Planned features include: fully parametric rendering to be able to control the colors/style of each element from settings.
+- control over the rendering of eraser (including accurate mode)
+- pencil textures
+- control over layers to be rendered, colors to be used
+- page ranges for export
+- optional simplification and smoothening (experimental)
+
+Planned features include:
+
+- fully parametric rendering to be able to control the colors/style of each element from settings
+- batch export
+- previewer with text recognition, annotations, and rendering options panels
+- text search
+- raster and SVG export
 
 ### Upload
 
-From the tree view, select a folder (or deselect to select the root) and drag and drop on the info panel any PDF (mutiple PDFs at once are supported, folders are planned but not supported yet).
+From the tree view, select a folder (or deselect to select the root) and drag and drop on the info panel any PDF (multiple PDFs/EPUBs at once are supported, folders are planned but not supported yet).
+Alternatively, choose <kbd>Upload Here...</kbd> from the contextual menu of the destination folder.
 
 
 - - -
