@@ -1,4 +1,4 @@
-from remy import *
+# from remy import *
 
 from PyQt5.QtGui import *
 from PyQt5.QtWidgets import *
@@ -6,12 +6,31 @@ from PyQt5.QtCore import *
 from PyQt5.QtPrintSupport import *
 
 import remy.remarkable.constants as rm
+from remy.remarkable.palette import *
 
 from itertools import groupby
 
 import time
 import logging
 log = logging.getLogger('remy')
+
+
+QUICK_ERASER    = 0
+IGNORE_ERASER   = 1
+ACCURATE_ERASER = 2
+AUTO_ERASER = 4
+AUTO_ERASER_IGNORE = 4
+AUTO_ERASER_ACCURATE = 5
+
+ERASER_MODE = {
+  "quick": QUICK_ERASER,
+  "ignore": IGNORE_ERASER,
+  "accurate": ACCURATE_ERASER,
+  "auto": AUTO_ERASER,
+}
+
+
+# SIMPLIFICATION LIBRARY
 
 try:
 
@@ -72,14 +91,14 @@ class QGraphicsPathItemD(QGraphicsPathItem):
 
 class PencilBrushes():
 
-  def __init__(self, N=15, size=200):
+  def __init__(self, N=15, size=200, color=Qt.black):
     from random import randint
     self._textures = []
     img = QImage(size, size, QImage.Format_ARGB32)
     img.fill(Qt.transparent)
     for i in range(N):
       for j in range(int(size*size*(i+1)/N/2.5)):
-        img.setPixelColor(randint(0,size-1),randint(0,size-1),Qt.black)
+        img.setPixelColor(randint(0,size-1),randint(0,size-1),color)
       self._textures.append(img.copy())
 
   def getIndex(self, i):
@@ -103,41 +122,6 @@ def pencilBrushes(**kw):
   if _pencilBrushes is None:
     _pencilBrushes = PencilBrushes(**kw)
   return _pencilBrushes
-
-
-DEFAULT_COLORS = {
-  0: Qt.black,
-  1: QColor('#bbbbbb'),
-  2: Qt.white,
-  6: QColor('#0062cc'),
-  7: QColor('#d90707'),
-}
-DEFAULT_HIGHLIGHT = {
-  1: QColor(255,235,147),
-  3: QColor(254,253,96),
-  4: QColor(169,250,92),
-  5: QColor(255,85,207),
-}
-ALPHA_HIGHLIGHT = {
-  1: QColor(255,235,147, 127),
-  3: QColor(254,253,96, 127),
-  4: QColor(169,250,92, 127),
-  5: QColor(255,85,207, 127),
-}
-
-QUICK_ERASER    = 0
-IGNORE_ERASER   = 1
-ACCURATE_ERASER = 2
-AUTO_ERASER = 4
-AUTO_ERASER_IGNORE = 4
-AUTO_ERASER_ACCURATE = 5
-
-ERASER_MODE = {
-  "quick": QUICK_ERASER,
-  "ignore": IGNORE_ERASER,
-  "accurate": ACCURATE_ERASER,
-  "auto": AUTO_ERASER,
-}
 
 
 def bezierInterpolation(K, coord):
@@ -190,8 +174,9 @@ class PageGraphicsItem(QGraphicsRectItem):
   def __init__(
       self,
       page,
-      colors=None,
-      highlight=DEFAULT_HIGHLIGHT,
+      palette={},
+      # colors=None,
+      # highlight=DEFAULT_HIGHLIGHT,
       pencil_resolution=.4,
       simplify=0,
       smoothen=False,
@@ -204,20 +189,23 @@ class PageGraphicsItem(QGraphicsRectItem):
 
     if isinstance(eraser_mode, str):
       eraser_mode = ERASER_MODE.get(eraser_mode, AUTO_ERASER)
-    if isinstance(colors, dict):
-      if 'highlight' in colors:
-        highlight = colors['highlight']
-        if not isinstance(highlight, dict):
-          highlight = {1: highlight, 3: highlight, 4: highlight, 5: highlight}
-      colors = {
-        0: QColor(colors.get('black', DEFAULT_COLORS[0])),
-        1: QColor(colors.get('gray', DEFAULT_COLORS[1])),
-        2: QColor(colors.get('white', DEFAULT_COLORS[2])),
-        6: QColor(colors.get('blue', DEFAULT_COLORS[6])),
-        7: QColor(colors.get('red', DEFAULT_COLORS[7])),
-      }
-    else:
-      colors = DEFAULT_COLORS
+    if not isinstance(palette, Palette):
+      palette = Palette(palette)
+
+    # if isinstance(colors, dict):
+    #   if 'highlight' in colors:
+    #     highlight = colors['highlight']
+    #     if not isinstance(highlight, dict):
+    #       highlight = {1: highlight, 3: highlight, 4: highlight, 5: highlight}
+    #   colors = {
+    #     0: QColor(colors.get('black', DEFAULT_COLORS[0])),
+    #     1: QColor(colors.get('gray', DEFAULT_COLORS[1])),
+    #     2: QColor(colors.get('white', DEFAULT_COLORS[2])),
+    #     6: QColor(colors.get('blue', DEFAULT_COLORS[6])),
+    #     7: QColor(colors.get('red', DEFAULT_COLORS[7])),
+    #   }
+    # else:
+    #   colors = DEFAULT_COLORS
 
     if simpl is None:
       simplify = 0
@@ -253,7 +241,7 @@ class PageGraphicsItem(QGraphicsRectItem):
           for r in hi.get('rects', []):
             ri = QGraphicsRectItemD(r.get('x',0),r.get('y',0),r.get('width',0), r.get('height',0), h)
             ri.setPen(QPen(Qt.NoPen))
-            ri.setBrush(highlight[hcolor])
+            ri.setBrush(palette.highlight(hcolor))
             ri.setToolTip(hi.get('text',''))
       group = QGraphicsPathItem()
       group.setPen(noPen)
@@ -265,15 +253,14 @@ class PageGraphicsItem(QGraphicsRectItem):
         # print(rm.TOOL_NAME.get(tool))
 
         # COLOR
-        if tool == rm.HIGHLIGHTER_TOOL:
-          pen.setColor(highlight[k.color])
-        elif tool == rm.ERASER_TOOL:
+        if tool == rm.ERASER_TOOL:
           pen.setColor(Qt.white)
-        elif k.color in colors:
-          pen.setColor(colors[k.color])
         else:
-          log.error("Tool %s Color %s not defined", rm.TOOL_NAME.get(tool, tool), k.color)
-          pen.setColor(Qt.red)
+          color = palette.colorFor(tool, k.color)
+          if color is None:
+            log.error("Tool %s Color %s not defined", rm.TOOL_NAME.get(tool, tool), k.color)
+            pen.setColor(Qt.red)
+          pen.setColor(color)
 
         # WIDTH CALCULATION
         if tool == rm.PENCIL_TOOL:

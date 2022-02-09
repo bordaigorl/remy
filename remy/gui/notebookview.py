@@ -8,7 +8,7 @@ from PyQt5.QtPrintSupport import *
 import remy.remarkable.constants as rm
 from remy.ocr.mathpix import mathpix
 
-from remy.remarkable.render import PageGraphicsItem, BarePageScene
+from remy.remarkable.render import PageGraphicsItem
 from remy.gui.export import webUIExport, exportDocument
 
 from os import path
@@ -143,9 +143,11 @@ class NotebookViewer(QGraphicsView):
     return self._templates[bg.name]
 
   def loadPage(self, i):
-    ermode = self.options.get("eraser_mode", "ignore")
-    pres = self.options.get("pencil_resolution", 0.4)
-    scene = self.makePageScene(i, eraser_mode=ermode, pencil_resolution=pres)
+    # ermode = self.options.get("eraser_mode", "ignore")
+    # pres = self.options.get("pencil_resolution", 0.4)
+    # pal = self.options.get("palette", {})
+    # scene = self.makePageScene(i, eraser_mode=ermode, pencil_resolution=pres, palette=pal)
+    scene = self.makePageScene(i, **self.options)
     self.setScene(scene)
     self._page = i
     self.refreshTitle()
