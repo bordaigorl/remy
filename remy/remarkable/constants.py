@@ -99,5 +99,29 @@ TOOL_LABEL = {
    "erase_area": "Erase Area",
 }
 
+COLORS = {
+      "black": "black",
+      "white": "white",
+       "gray": "#bbbbbb",
+        "red": "#d90707",
+       "blue": "#0062cc",
+  "highlight": "#7fffeb93", # old highlighter (#AARRGGBB)
+     "yellow": "#fefd60",
+      "green": "#a9fa5c",
+       "pink": "#ff55cf",
+}
 
+COLOR_CODES = {
+  0: "black",
+  1: "gray",
+  2: "white",
+  6: "blue",
+  7: "red",
+}
 
+HIGHLIGHTER_CODES = {
+  1: "highlight",
+  3: "yellow",
+  4: "green",
+  5: "pink",
+}

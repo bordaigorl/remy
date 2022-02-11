@@ -1,14 +1,22 @@
 #!/usr/bin/env python3
-import sys
-import os
 import json
 from itertools import *
 from collections import namedtuple
 import arrow
 import uuid
 
+from os import stat
+from pathlib import Path
+
 from remy.remarkable.lines import *
 from remy.remarkable.constants import *
+from remy.utils import deepupdate
+from copy import deepcopy
+
+from threading import RLock
+
+import logging
+log = logging.getLogger('remy')
 
 # DocIndex = namedtuple('DocIndex', 'metadata tree trash')
 FolderNode = namedtuple('FolderNode', 'folders files')
@@ -46,6 +54,9 @@ class RemarkableDocumentError(RemarkableError):
 class RemarkableSourceError(RemarkableError):
   pass
 
+class RemarkableUidCollision(RemarkableError):
+  pass
+
 METADATA = 1
 CONTENT = 2
 BOTH = 3
@@ -67,11 +78,34 @@ class Entry:
   def _postInit(self):
     pass
 
+  def isRoot(self):
+    return False
+
   def name(self):
     return self._metadata.get('visibleName')
 
   def isDeleted(self):
     return self.index.isDeleted(self.uid)
+
+  def isIndirectlyDeleted(self):
+    return self.index.isIndirectlyDeleted(self.uid)
+
+  def isFolder(self):
+    return self.index.isFolder(self.uid)
+
+  def isTrash(self):
+    return self.index.isTrash(self.uid)
+
+  def parentEntry(self):
+    if self.parent is None:
+      return None
+    return self.index.get(self.parent)
+
+  def ancestry(self):
+    return self.index.ancestryOf(self.uid, exact=True)
+
+  def path(self, delim=None):
+    return self.index.pathOf(self.uid, delim=delim)
 
   def updatedOn(self):
     try:
@@ -109,7 +143,7 @@ class Entry:
 
   def __dir__(self):
     return (
-      ["name", "updatedOn", "get"]
+      ["name", "updatedOn", "isDeleted", "get", "fsource"]
       + list(self._metadata.keys())
       + list(self._content.keys())
     )
@@ -134,8 +168,8 @@ class Folder(Entry):
     else:
       return default
 
-  def isRoot(self):
-    return False
+  def typeName(self):
+    return "folder"
 
 
 ROOT_ID = ''
@@ -174,22 +208,29 @@ class TrashBin(Folder):
     self._postInit()
 
   def append(self, entry):
-    self.files.append(entry)
+    if entry.type == FOLDER_TYPE:
+      self.folders.append(entry.uid)
+    else:
+      self.files.append(entry.uid)
 
   def items(self):
+    yield from self.folders
     yield from self.files
+
+  def typeName(self):
+    return "trash"
 
 
 class Document(Entry):
 
-  def getPage(self, pageNum):
+  def getPage(self, pageNum, force=False):
     pages = self.pages
     try:
       if pages is None:
         pid = str(pageNum)
       else:
         pid = pages[pageNum]
-      rmfile = self.fsource.retrieve(self.uid, pid, ext='rm')
+      rmfile = self.fsource.retrieve(self.uid, pid, ext='rm', force=force)
       with open(rmfile, 'rb') as f:
         (ver, layers) = readLines(f)
     except:
@@ -227,10 +268,13 @@ class Document(Entry):
     self.fsource.prefetchDocument(self.uid, progress=progress)
 
   def retrieveBaseDocument(self):
-    b = self.baseDocumentName()
-    if b and self.fsource.exists(b):
-      return self.fsource.retrieve(b)
     return None
+
+  def shouldHaveBaseDocument(self):
+    return False
+
+  def hasBaseDocument(self):
+    return False
 
   def baseDocument(self):
     return None
@@ -272,10 +316,14 @@ class Notebook(Document):
       template = None
     return Page(layers, version, pageNum, document=self, background=template)
 
+  def typeName(self):
+    return "notebook"
+
 
 class PDFBasedDoc(Document):
 
   _pdf = None
+  _pdf_lock = RLock()
 
   def _makePage(self, layers, version, pageNum):
     return Page(layers, version, pageNum, document=self)
@@ -285,20 +333,35 @@ class PDFBasedDoc(Document):
       if self.fsource.exists(self.uid, p, ext='rm'):
         yield i
 
+  def retrieveBaseDocument(self):
+    b = self.baseDocumentName()
+    if b and self.fsource.exists(b):
+      return self.fsource.retrieve(b)
+    return None
+
+  def shouldHaveBaseDocument(self):
+    return True
+
+  def hasBaseDocument(self):
+    b = self.baseDocumentName()
+    return b and self.fsource.exists(b)
+
   def baseDocument(self):
     from popplerqt5 import Poppler
-    if self._pdf is None:
-      doc = self.retrieveBaseDocument()
-      if doc is None:
-        log.warning("Base document for %s could not be found", self.uid)
-        return None
-      self._pdf = Poppler.Document.load(doc)
-      self._pdf.setRenderHint(Poppler.Document.Antialiasing)
-      self._pdf.setRenderHint(Poppler.Document.TextAntialiasing)
-      try:
-        self._pdf.setRenderHint(Poppler.Document.HideAnnotations)
-      except Exception:
-        pass
+    with self._pdf_lock:
+      if self._pdf is None:
+        doc = self.retrieveBaseDocument()
+        if doc is None:
+          log.warning("Base document for %s could not be found", self.uid)
+          return None
+        self._pdf = Poppler.Document.load(doc)
+        self._pdf.lock = RLock()
+        self._pdf.setRenderHint(Poppler.Document.Antialiasing)
+        self._pdf.setRenderHint(Poppler.Document.TextAntialiasing)
+        try:
+          self._pdf.setRenderHint(Poppler.Document.HideAnnotations)
+        except Exception:
+          pass
     return self._pdf
 
   def baseDocumentName(self):
@@ -309,7 +372,9 @@ class PDFBasedDoc(Document):
 
 
 class PDFDoc(PDFBasedDoc):
-  pass
+
+  def typeName(self):
+    return "pdf"
 
 
 class EBook(PDFBasedDoc):
@@ -317,8 +382,11 @@ class EBook(PDFBasedDoc):
   def originalName(self):
     return self.uid + '.epub'
 
+  def typeName(self):
+    return "epub"
 
-PDF_BASE_METADATA = {
+
+DOC_BASE_METADATA = {
     "deleted": False,
     "metadatamodified": True,
     "modified": True,
@@ -352,26 +420,66 @@ PDF_BASE_CONTENT  = {
     }
 }
 
+EPUB_BASE_CONTENT = {
+  "dummyDocument": False,
+  "extraMetadata": {},
+  "fileType": "epub",
+  "fontName": "Noto Serif",
+  "legacyEpub": False,
+  "lineHeight": 150,
+  "margins": 200,
+  "orientation": "portrait",
+  "textAlignment": "justify",
+  "textScale": 0.8,
+  "lastOpenedPage": 0,
+  "pageCount": 0,
+  "transform": {
+    "m11": 1, "m12": 0, "m13": 0,
+    "m21": 0, "m22": 1, "m23": 0,
+    "m31": 0, "m32": 0, "m33": 1
+  }
+}
+
+DOC_BASE_CONTENT  = {
+  PDF: PDF_BASE_CONTENT,
+  EPUB: EPUB_BASE_CONTENT,
+}
 
 
+FOLDER_METADATA = {
+    "deleted": False,
+    "metadatamodified": True,
+    "modified": True,
+    "parent": "",
+    "pinned": False,
+    "synced": False,
+    "type": "CollectionType",
+    "version": 0,
+    # "lastModified": "timestamp",
+    # "visibleName": "..."
+}
 
 
 class RemarkableIndex:
 
-  _listeners = {}
+  _upd_lock = RLock()
 
   def __init__(self, fsource, progress=(lambda x,tot: None)):
     self.fsource = fsource
-    self._uids = list(fsource.listItems())
+    uids = list(fsource.listItems())
     index = {ROOT_ID: RootFolder(self)}
 
-    # progress(0, len(self._uids))
+    # progress(0, len(uids))
 
-    for j, uid in enumerate(self._uids):
-      print('%d%%' % (j * 100 // len(self._uids)), end='\r',flush=True)
-      progress(j, len(self._uids)*2)
-      metadata = self._readJson(uid, ext='metadata')
-      content  = self._readJson(uid, ext='content')
+    for j, uid in enumerate(uids):
+      # print('%d%%' % (j * 100 // len(uids)), end='\r',flush=True)
+      progress(j, len(uids)*2)
+      try:
+        metadata = self._readJson(uid, ext='metadata')
+        content  = self._readJson(uid, ext='content')
+      except Exception as e:
+        log.warning("Could not load metadata of %s: skipping [%s]", uid, e)
+        continue
       if metadata["type"] == FOLDER_TYPE:
         index[uid] = Folder(self, uid, metadata, content)
       elif metadata["type"] == DOCUMENT_TYPE:
@@ -387,10 +495,10 @@ class RemarkableIndex:
         raise RemarkableDocumentError("Unknown file type '{type}'".format(metadata))
     trash = TrashBin(self)
     for k, prop in index.items():
-      progress(len(self._uids)+j, len(self._uids)*2)
+      progress(len(uids)+j, len(uids)*2)
       try:
         if prop.deleted or prop.parent == TRASH_ID:
-          trash.append(k)
+          trash.append(prop)
           continue
         parent = prop.parent
         if parent is not None:
@@ -409,24 +517,26 @@ class RemarkableIndex:
     with open(fname) as f:
       return json.load(f)
 
-  NOP = 0 # for acks
-  ADD = 1 # adding an item (listener should consider updating parent)
-  DEL = 2 # removing item (listener should consider updating parent)
-  UPD = 3 # updating metadata of item
+  def _new_entry_prepare(self, uid, etype, meta, path=None):
+    pass # for subclasses to specialise
 
-  def listen(self, f):
-    if not callable(f):
-      raise Exception("Listen called on a non-callable argument")
-    self._listeners[id(f)] = f
-    return id(f)
+  def _new_entry_progress(self, uid, done, tot):
+    pass # for subclasses to specialise
 
-  def unlisten(self, f):
-    return self._listeners.pop(id(f), None) is not None
+  def _new_entry_error(self, exception, uid, etype, meta, path=None):
+    pass # for subclasses to specialise
 
-  def _broadcast(self, success=True, action=NOP, entries=[], **kw):
-    for f in self._listeners.values():
-      f(success, action, entries, self, kw)
+  def _new_entry_complete(self, uid, etype, meta, path=None):
+    pass # for subclasses to specialise
 
+  def _update_entry_prepare(self, uid, new_meta, new_content):
+    pass # for subclasses to specialise
+
+  def _update_entry_complete(self, uid, new_meta, new_content):
+    pass # for subclasses to specialise
+
+  def _update_entry_error(self, exception, uid, new_meta, new_content):
+    pass # for subclasses to specialise
 
 
   def isReadOnly(self):
@@ -440,15 +550,15 @@ class RemarkableIndex:
       uid = self.matchId(uid)
     if uid in self.index:
       return self.index[uid]
+    elif uid ==TRASH_ID:
+      return self.trash
     else:
       raise RemarkableError("Uid %s not found!" % uid)
 
-  def allUids(self, trashToo=False):
-    yield from self._uids
-    if trashToo:
-      yield from self.trash.items()
+  def allUids(self):
+    return self.index.keys()
 
-  def ancestry(self,uid,exact=True):
+  def ancestryOf(self, uid, exact=True, includeSelf=False, reverse=True):
     if not exact:
       uid = self.matchId(uid)
     p = []
@@ -456,13 +566,18 @@ class RemarkableIndex:
       if uid in self.index:
         p.append(uid)
         uid = self.index[uid].parent
+      elif uid == TRASH_ID:
+        p.append(TRASH_ID)
+        break
       else:
         return None
-    return reversed(p[1:])
+    if not includeSelf: p = p[1:]
+    if reverse: p = reversed(p)
+    return p
 
-  def pathOf(self,uid, exact=True, delim=None):
-    p = map(lambda x: self.index[x].visibleName,
-            self.ancestry(uid,exact))
+  def pathOf(self, uid, exact=True, delim=None):
+    p = map(lambda x: self.nameOf(x),
+            self.ancestryOf(uid,exact))
     if delim is None:
       return p
     else:
@@ -475,20 +590,17 @@ class RemarkableIndex:
     return p
 
 
-  def uidFromPath(self, path, start=None, delim=None):
+  def uidFromPath(self, path, start=ROOT_ID, delim=None):
     p = path
     if delim is not None:
       p = path.rstrip(delim).split(delim)
     if not p:
-      return ''
-    if start:
-      node = self.index[start]
-    else:
-      node = self.root()
-    if p[0] == '':
+      return ROOT_ID
+    node = self.index[start]
+    if p[0] == '' or p[0] == '/':
       node = self.root()
     for name in p[0:-1]:
-      if name == '.' or name == '':
+      if name == '.' or name == '' or name == '/':
         continue
       if name == '..':
         node = self.index[node.parent]
@@ -502,7 +614,7 @@ class RemarkableIndex:
       if not newfound:
         return None
     last = p[-1]
-    if last == '.' or last == '':
+    if last == '.' or last == '' or last == '/':
       return node.uid
     if last == '..':
       return node.parent
@@ -554,27 +666,23 @@ class RemarkableIndex:
       t = t >> 4
     return t
 
-  def matchId(self, pid, trashToo=False):
+  def matchId(self, pid):
     for k in self.index:
       if k.startswith(pid):
         return k
-    if trashToo:
-      for k in self.trash.items():
-        if k.startswith(pid):
-          return k
     return None
 
-  def pathOf(self, uid, exact=True, trash_too=False):
-    if not exact:
-      uid = self.match_id(uid)
-    p = []
-    while uid:
-      if uid in self.index and (trash_too or uid not in self.trash.items()):
-          p.append(self.index[uid].visibleName)
-          uid = self.index[uid].parent
-      else:
-        return None
-    return reversed(p[1:])
+  # def pathOf(self, uid, exact=True, trash_too=False):
+  #   if not exact:
+  #     uid = self.match_id(uid)
+  #   p = []
+  #   while uid:
+  #     if uid in self.index and (trash_too or not self.isDeleted(uid)):
+  #         p.append(self.index[uid].visibleName)
+  #         uid = self.index[uid].parent
+  #     else:
+  #       return None
+  #   return reversed(p[1:])
 
   def findByName(self, name, exact=False):
     if exact:
@@ -587,10 +695,13 @@ class RemarkableIndex:
           yield k
 
   def isFile(self, uid):
-    return uid!=ROOT_ID and (uid in self.index and self.index[uid].type == DOCUMENT_TYPE)
+    return uid!=TRASH_ID and (uid in self.index and self.index[uid].type == DOCUMENT_TYPE)
 
   def isFolder(self, uid):
-    return uid==ROOT_ID or (uid in self.index and self.index[uid].type == FOLDER_TYPE)
+    return uid==TRASH_ID or (uid in self.index and self.index[uid].type == FOLDER_TYPE)
+
+  def isTrash(self, uid):
+    return uid==TRASH_ID
 
   def updatedOn(self, uid):
     try:
@@ -600,11 +711,16 @@ class RemarkableIndex:
     return updated
 
   def nameOf(self, uid):
-    return (self.index[uid].visibleName
-                if uid in self.index else None)
+    return self.get(uid).visibleName
 
   def isDeleted(self, uid):
-    return uid in self.trash.items()
+    return uid != TRASH_ID and (self.index[uid].deleted or self.index[uid].parent == TRASH_ID)
+
+  def isIndirectlyDeleted(self, uid):
+    for f in self.ancestryOf(uid, includeSelf=True, reverse=False):
+      if self.isDeleted(f):
+        return True
+    return False
 
   def __getattr__(self, field):
     if field.endswith("Of"):
@@ -617,6 +733,8 @@ class RemarkableIndex:
   def scanFolders(self, uid=ROOT_ID):
       if isinstance(uid, Entry):
         n = uid
+      elif uid == TRASH_ID:
+        n = self.trash
       else:
         n = self.index[uid]
       if isinstance(n, Folder):
@@ -630,6 +748,8 @@ class RemarkableIndex:
   def depthFirst(self, uid=ROOT_ID):
       if isinstance(uid, Entry):
         n = uid
+      elif uid == TRASH_ID:
+        n = self.trash
       else:
         n = self.index[uid]
       if isinstance(n, Folder):
@@ -646,43 +766,211 @@ class RemarkableIndex:
       else:
         yield n
 
+  _reservedUids = set()
 
-  def _newUid(self):
+  def reserveUid(self):
+    # collisions are highly unlikely, but good to check
     uid = str(uuid.uuid4())
-    while uid in self.index:
+    while uid in self.index or uid in self._reservedUids:
       uid = str(uuid.uuid4())
+    self._reservedUids.add(uid)
     return uid
 
-  def newPDFDoc(self, pdf, metadata={}, content={}):
-    if self.isReadOnly():
-      raise RemarkableSourceError("The file source '%s' is read-only" % self.fsource.name)
-    uid = self._newUid()
-    print(uid)
-    meta = PDF_BASE_METADATA.copy()
-    meta.setdefault('visibleName', os.path.splitext(os.path.basename(pdf))[0])
-    meta.setdefault('lastModified', str(arrow.utcnow().int_timestamp * 1000))
-    meta.update(metadata)
+  def newFolder(self, uid=None, progress=None, **metadata):
+    try:
+      if self.isReadOnly():
+        raise RemarkableSourceError("The file source '%s' is read-only" % self.fsource.name)
 
-    cont = PDF_BASE_CONTENT.copy()
-    cont.update(content)
+      if not uid:
+        uid = self.reserveUid()
 
+      log.info("Preparing creation of %s", uid)
+      self._new_entry_prepare(uid, FOLDER, metadata)
+
+      def p(x):
+        if callable(progress):
+          progress(x, 2)
+        self._new_entry_progress(uid, x, 2)
+
+      if self.fsource.exists(uid, ext="metadata"):
+        raise RemarkableUidCollision("Attempting to create new document but chosen uuid is in use")
+
+      p(0)
+
+      meta = FOLDER_METADATA.copy()
+      meta.setdefault('visibleName', 'New Folder')
+      meta.setdefault('lastModified', str(arrow.utcnow().int_timestamp * 1000))
+      meta.update(metadata)
+      if not self.isFolder(meta["parent"]):
+        raise RemarkableError("Cannot find parent %s" % meta["parent"])
+
+      self.fsource.store(meta, uid + '.metadata')
+      p(1)
+      self.fsource.store({}, uid + '.content')
+      p(2)
+
+      self.index[uid] = d = Folder(self, uid, meta, {})
+      self.index[d.parent].files.append(uid)
+      self._reservedUids.discard(uid)
+
+      self._new_entry_complete(uid, FOLDER, metadata)
+      return uid
+    except Exception as e:
+      # cleanup if partial upload
+      self.fsource.remove(uid + '.metadata')
+      self.fsource.remove(uid + '.content')
+      self._new_entry_error(e, uid, FOLDER, metadata)
+      raise e
+
+
+  def newDocument(self, path=None, uid=None, content={}, progress=None, **metadata):
     try:
 
-      self.fsource.upload(pdf, uid + '.pdf')
+      if self.isReadOnly():
+        raise RemarkableSourceError("The file source '%s' is read-only" % self.fsource.name)
+
+      if not uid:
+        uid = self.reserveUid()
+      path = Path(path)
+      ext = path.suffix
+      if ext.lower() == ".pdf":
+        etype = PDF
+      elif ext.lower() == ".epub":
+        etype = EPUB
+      else:
+        raise RemarkableError("Can only upload PDF and EPUB files, but was given a %s" % ext.upper())
+
+      log.info("Preparing creation of %s", uid)
+      self._new_entry_prepare(uid, etype, metadata, path)
+
+      totBytes = 0
+      if callable(progress):
+        def p(x):
+          progress(x, totBytes)
+          self._new_entry_progress(uid, x, totBytes)
+        def up(x, t):
+          p(400+x)
+      else:
+        def p(x,t=0): pass
+        up = None
+
+      if self.fsource.exists(uid, ext="metadata"):
+        raise RemarkableUidCollision("Attempting to create new document but chosen uuid is in use")
+
+      meta = DOC_BASE_METADATA.copy()
+      meta.setdefault('visibleName', path.stem)
+      meta.setdefault('lastModified', str(arrow.utcnow().int_timestamp * 1000))
+      deepupdate(meta, metadata)
+      if not self.isFolder(meta["parent"]):
+        raise RemarkableError("Cannot find parent %s" % meta["parent"])
+
+      cont = deepcopy(DOC_BASE_CONTENT[etype])
+      deepupdate(cont, content)
+
+      # imaginary 100bytes per json file
+      totBytes = 400 + stat(path).st_size
+
+      p(0)
       self.fsource.store(meta, uid + '.metadata')
+      p(200)
       self.fsource.store(cont, uid + '.content')
+      p(300)
       self.fsource.store('', uid + '.pagedata')
+      p(400)
+      self.fsource.upload(path, uid + ext, progress=up)
       self.fsource.makeDir(uid)
 
-      self.index[uid] = d = PDFDoc(self, uid, meta, cont)
+      if etype == PDF:
+        d = PDFDoc(self, uid, meta, cont)
+      else:
+        d = EBook(self, uid, meta, cont)
+      self.index[uid] = d
       self.index[d.parent].files.append(uid)
+      self._reservedUids.discard(uid)
 
-      self._broadcast(action=self.ADD, entries=[uid])
+      p(totBytes)
+      self._new_entry_complete(uid, etype, metadata, path)
 
       return uid
 
     except Exception as e:
-      print(e)
-      self._broadcast(success=False, action=self.ADD, entries=[uid], reason=e)
-      # should cleanup if partial upload
-      return None
+      # cleanup if partial upload
+      self.fsource.remove(uid + ext)
+      self.fsource.remove(uid + '.metadata')
+      self.fsource.remove(uid + '.content')
+      self.fsource.remove(uid + '.pagedata')
+      self.fsource.removeDir(uid)
+      self._new_entry_error(e, uid, etype, metadata, path)
+      raise e
+
+
+  def update(self, uid, content={}, **metadata):
+    # If you need this to look atomic vs concurrent reads
+    # of metadata modify only one field at a time
+    try:
+      with self._upd_lock:
+        self._update_entry_prepare(uid, metadata, content)
+
+        if uid == ROOT_ID or uid == TRASH_ID:
+          raise RemarkableError("Cannot update root and trash entries")
+
+        entry = self.get(uid)
+
+        if content:
+          cont = deepcopy(entry._content)
+          deepupdate(cont, content)
+          self.fsource.store(cont, uid + '.content', overwrite=True)
+          entry._content = cont
+
+        if metadata or content: # if content changed, bump version
+          new_parent = old_parent = None # flagging no reparenting needed
+          if 'type' in metadata:
+            raise RemarkableError("Cannot change type of document")
+          # Safety checks for move operations
+          if 'parent' in metadata:
+            old_parent = entry.parentEntry()
+            new_parent = self.get(metadata['parent'])
+            if not new_parent.isFolder():
+              raise RemarkableError("Cannot change parent of %s to %s which is not a folder" % (uid, new_parent.uid))
+            if entry.isFolder() and uid in new_parent.ancestry():
+              raise RemarkableError("Circularity would be introduced by making %s a parent of %s" % (new_parent.uid, uid))
+          meta = deepcopy(entry._metadata)
+          metadata.setdefault('lastModified', str(arrow.utcnow().int_timestamp * 1000))
+          metadata.setdefault('metadatamodified', True)
+          metadata.setdefault('version', entry.version+1)
+          deepupdate(meta, metadata)
+          self.fsource.store(meta, uid + '.metadata', overwrite=True)
+
+          entry._metadata = meta
+          if new_parent is not None:
+            if entry.isFolder():
+              old_parent.folders.remove(uid)
+              new_parent.folders.append(uid)
+            else:
+              old_parent.files.remove(uid)
+              new_parent.files.append(uid)
+
+        self._update_entry_complete(uid, metadata, content)
+    except Exception as e:
+      self._update_entry_error(e, uid, metadata, content)
+      raise e
+
+  def moveToTrash(self, uid):
+    with self._upd_lock:
+      if not self.isDeleted(uid):
+        self.update(uid, parent=TRASH_ID)
+
+  def rename(self, uid, new_name):
+    self.update(uid, visibleName=new_name)
+
+  def newFolderWith(self, uids=[], **metadata):
+    with self._upd_lock:
+      fuid = self.newFolder(**metadata)
+      for uid in uids:
+        self.update(uid, parent=fuid)
+
+  def moveAll(self, uids, parent):
+    with self._upd_lock:
+      for uid in uids:
+        self.update(uid, parent=parent)
+

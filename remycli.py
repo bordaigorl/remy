@@ -45,7 +45,7 @@ def list_trash(docs):
   files = []
   lw = 20
   for uid in docs.trash:
-    p = docs.pathOf(uid,trashToo=True)
+    p = docs.pathOf(uid)
     if p is None:
       p = "UNKNOWN"
     else:

@@ -111,7 +111,7 @@ def connect(address='10.11.99.1', username='root', password=None, key=None, time
   try:
     log.info('Connecting...') # pkey=key,
     client.connect(address, **options)
-    log.info("Connected to {}".format(address))
+    log.info("Connected to %s", address)
     client.hostname = address
   except socket.timeout as e:
     log.error("Could not connect to %s: %s", address, e)

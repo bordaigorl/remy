@@ -9,21 +9,8 @@ import logging
 log = logging.getLogger('remy')
 
 
-def deepupdate(d, u):
-  stack = [(d,u)]
-  while stack:
-    d,u = stack.pop(0)
-    for k,v in u.items():
-      if not isinstance(v, dict):
-        d[k] = v
-      else:
-        if k not in d:
-          d[k] = v
-        elif not isinstance(d[k], dict):
-          d[k] = v
-        else:
-          stack.append((d[k], v))
-  return d
+from remy.utils import deepupdate
+
 
 AppPaths = namedtuple('AppPaths', ['config_dir', 'config', 'known_hosts', 'cache_dir'])
 noPaths = AppPaths(None,None,None,None)
@@ -45,12 +32,6 @@ OPTIONS_DEFAULTS = {
     "smoothen": False,
     "simplify": 0,
     "pencil_resolution": 0.4, # Alas QPrinter ignores QBrush's transforms
-    "colors": {
-      "black": "black",
-      "gray": "#bbbbbb",
-      "white": "white",
-      "highlight": "#55ffeb93"
-    }
   },
   "preview": {
     "eraser_mode": "ignore",
@@ -58,6 +39,9 @@ OPTIONS_DEFAULTS = {
   },
   "import": {
     "default_options": {}
+  },
+  "palettes": {
+    "default": {}
   }
 }
 
@@ -94,6 +78,8 @@ class RemyConfig():
 
   _curr_source = None
 
+  _palettes = None
+
   # TODO: store AppPaths here, nuke the _default_path _default_cache fields
   #       also handle _path this way
   #       loadFromConfig could be returning desired args to merge, without merging
@@ -120,7 +106,7 @@ class RemyConfig():
       with open(path) as f:
         self._original = json.load(f)
     except Exception:
-      raise RemyConfigException("Could not read configuration from '%s'!" % confpath)
+      raise RemyConfigException("Could not read configuration from '%s'!" % path)
     deepupdate(self._config, self._original)
     self._path = path
 
@@ -156,8 +142,18 @@ class RemyConfig():
     return default
 
   @property
+  def palettes(self):
+    if self._palettes is None:
+      # All this so that if you do not request palettes you don't depend on PyQt
+      from remy.remarkable.palette import PalettePresets
+      self._palettes = PalettePresets(self.get('palettes', {}))
+    return self._palettes
+
+  @property
   def export(self):
-    return deepcopy(self._config['export'])
+    opt = deepcopy(self._config['export'])
+    opt['palette'] = self.palettes.get(opt.get('palette', 'default'))
+    return opt
 
   @property
   def import_(self):
@@ -165,7 +161,9 @@ class RemyConfig():
 
   @property
   def preview(self):
-    return deepcopy(self._config['preview'])
+    opt = deepcopy(self._config['preview'])
+    opt['palette'] = self.palettes.get(opt.get('palette', 'default'))
+    return opt
 
   def set(self, opt, v):
     self._config[opt] = v

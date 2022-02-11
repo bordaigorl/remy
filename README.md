@@ -1,6 +1,8 @@
-# reMy, a reMarkable tablet manager app
+# Remy, a reMarkable tablet manager app
 
-The goal of reMy is to allow simple interaction with the reMarkable tablet over ssh, without needing the cloud service, nor the USB Web UI.
+The goal of Remy is to allow simple interaction with the reMarkable tablet over ssh, without needing the cloud service, nor the USB Web UI.
+
+![Screenshot](assets/screenshot.png)
 
 
 **BEWARE**
@@ -10,7 +12,7 @@ It has not been thoroughly tested.
 These instructions are preliminary and will be expanded with time.
 Feel free to populate the wiki!
 
-I did my best to make sure usage of reMy will not incur in data loss.
+I did my best to make sure usage of Remy will not incur in data loss.
 Most of the features exclusively read from the tablet and are completely safe, even if they may fail on the computer side.
 The only features that alters data on the tablet is the upload feature.
 It is however very unlikely to cause any problem since it only adds files.
@@ -23,7 +25,7 @@ For a basic backup of the tablet's data:
 
 ## Installation
 
-The installation process is a bit less straightforward than ideal because `python-poppler-qt5` has [broken installation scripts](https://github.com/frescobaldi/python-poppler-qt5/pull/41).
+The installation process is a bit less straightforward than ideal because `python-poppler-qt5` has [broken installation scripts](https://github.com/frescobaldi/python-poppler-qt5/pull/45).
 
 The requirements are:
 
@@ -33,8 +35,11 @@ The requirements are:
 - paramiko
 - PyPDF2
 - PyQt5
-- simplification (this requires python < 3.9, but I plan to make this dependency optional)
 - python-poppler-qt5 (see below)
+
+Optional:
+
+- simplification (this requires python < 3.9, but I plan to make this dependency optional)
 
 The following works on MacOs (Catalina), assuming `python` version 3.8 (if not, use `pyenv` to install and manage Python versions):
 
@@ -44,7 +49,7 @@ brew install cmake poppler
 # Install regular dependencies
 pip install requests arrow paramiko PyPDF2 PyQt5 simplification sip
 # Install python-poppler-qt5 using SIP5
-pip install git+https://github.com/mitya57/python-poppler-qt5.git@sip5
+pip install git+git://github.com/frescobaldi/python-poppler-qt5@92e5962ec3751ab051d0b655fd61afc7a1cf709e
 ```
 
 
@@ -67,6 +72,7 @@ Create a JSON file at that path with the following structure:
       ...
   },
   "default_source": "source1",
+  "palettes" : {...},
   "preview": {...},
   "export": {...},
   "mathpix" : {...}
@@ -81,7 +87,7 @@ The file `example_config.json` is an example configuration that you can adapt to
 ### Source types
 Each source defines a possible way to get the contents to display.
 The `default_source` settings indicates which source to load if none is specified in the command line.
-If `default_source` is `false` or not set, then reMy shows a dialog allowing you to pick a source among the available ones.
+If `default_source` is `false` or not set, then Remy shows a dialog allowing you to pick a source among the available ones.
 There are three supported kinds of sources: `local`, `ssh` and `rsync`.
 
 #### Local source
@@ -143,7 +149,7 @@ It is possible to specify `remote_documents` and `remote_templates`, these paths
 
 This is an optimised version of the SSH source.
 While SSH works without extra dependencies, the rsync source requires `rsync` to be installed on the reMarkable.
-A mandatory setting is `data_dir` which should point to a directory which can be managed by reMy to keep a partial copy of the tablet's data.
+A mandatory setting is `data_dir` which should point to a directory which can be managed by Remy to keep a partial copy of the tablet's data.
 Every time you connect, only the changes are downloaded.
 The data-heavy files (PDFs and .rm) are downloaded on demand.
 The optional settings `rsync_path` provides the path to the local rsync binary and `rsync_options` provides additional options, the example above configures the options to find the rsync binary on the remarkable installed using entware.
@@ -151,35 +157,132 @@ The optional settings `rsync_path` provides the path to the local rsync binary a
 
 #### The `use_banner` option
 
-When this option is set, the main UI of the tabled will be temporarily disabled while reMy is open.
+When this option is set, the main UI of the tabled will be temporarily disabled while Remy is open.
 This is intended as an helpful prompt and a way to avoid conflicts on data access.
 The feature works best if the setting is the filename (can be absolute, or relative to home) of a png file stored on the tablet (there's a nice `remy-banner.png` in the asset folders you can upload with `scp`) and [`remarkable-splash`](https://github.com/ddvk/remarkable-splash) is installed on the tablet.
 
-If reMy crashes and the remarkable seems unresponsive it is only because reMy re-enables the main UI of the tabled on exit; to regain control of the tablet you have three options: try and run reMy again and close it cleanly; or run `ssh REMARKABLEHOST /bin/systemctl start xochitl`; or manually reboot the device. Don't worry nothing bad is happening to the tablet in this circumstance.
+If Remy crashes and the remarkable seems unresponsive it is only because Remy re-enables the main UI of the tabled on exit; to regain control of the tablet you have three options: try and run Remy again and close it cleanly; or run `ssh REMARKABLEHOST /bin/systemctl start xochitl`; or manually reboot the device. Don't worry nothing bad is happening to the tablet in this circumstance.
+
+### Palettes section
+
+The `palettes` section is a dictionary of color palettes, for example:
+
+```json
+"palettes": {
+    "review": {
+        "black": "red",
+        "gray": "#009C26"
+    },
+    "grayscale": {
+        "black": "black",
+        "gray": "#bbbbbb",
+        "white": "white",
+        "blue": "#cccccc",
+        "red": "#dddddd",
+        "highlight": "#7fcccccc",
+        "yellow": "#7fcccccc",
+        "green": "#7fbbbbbb",
+        "pink": "#7fdddddd"
+    }
+}
+```
+
+There is always a `'default'` palette with the built-in choice of colors.
+You can overwrite it by redefining it in the `palettes` dictionary.
+All other palettes inherit the non-specified colors from the built-in defaults.
+
+The palettes defined in the section are used in two ways:
+
+- they are offered as options in the Export dialog
+- the defined names can be used as values of the `palette` setting in the `preview` and `export` sections.
+
+The color identifiers are `black`, `gray`, `white`, `blue`, and `red`,
+and for the highlighter colors they are `highlight` (for the old opacity-based highlighter) `yellow`, `green`, and `pink`.
+
+Currently it is not possible to change the pencil's color.
+
+
+### Render options
+
+The `preview` and `export` sections can contain settings that affect the rendering (which we will group in the explanation as `RENDER_OPTIONS`).
+
+All these settings are optional.
+The `RENDER_OPTIONS` settings can set the following keys:
+
+- `palette`
+  can be set either to the name of a palette defined in the `palettes` section, or to a dictionary with color definitions (as used in the `palettes` dictionary).
+
+- `pencil_resolution`
+  can be set to a number indicating how much to scale the texture of pencil brushes. Bigger scale means coarser texture.
+  Default is `0.4`.
+  Due to limitations of Qt, the PDF export currently ignores this setting.
+
+- `simplify`
+  can be set to a number indicating a tolerance for the precision of strokes.
+  High tolerance means strokes will be more approximate.
+  Requires the `simplification` library.
+  Default is `0` (no simplification).
+  
+- `smoothen`
+  can be set to `true` or `false`. Default is `false`.
+  If set, the renderer would produce beziers interpolating the original strokes.
+  Can be used in combination with `simplify` to obtain smaller files with smooth lines.
+  The feature is still experimental.
+  
+- `eraser_mode`
+  can be set to either `"accurate"`, `"ignore"`, `"quick"`, or `"auto"`. Default is `"auto"`.
+
+  * The `"accurate"` method clips the paths so that the erased areas are see-through.
+    This incurs in expensive calculations and bigger files.
+    It makes a difference only when the eraser is used to carve out precise bits out of wide stroked areas.
+  * The `"ignore"` method gives generally the best tradeoff. It simply ignores the eraser strokes.
+    The tablet already removes from the file the strokes that were completely covered by eraser strokes.
+    The only inaccuracies come from strokes that were only partially covered.
+    For written notes or line art this is the best method.
+  * The `"quick"` method paints white strokes to render the eraser tool.
+    This results in quicker rendering times but inaccurate results:
+    the layers below the strokes would be covered by the eraser which is undesirable.
+  * `"auto"` will use `"ignore"` and automatically switch to `"accurate"` when the page contains strokes that may need the accurate method to be rendered precisely (e.g. with very wide strokes).
+  
+  
+- `exclude_layers`
+  can be set to a list of numbers between 1 and 5 indicating which layers to exclude from the rendering.
+
+- `orientation`
+  can be set to `auto`, `landscape` or `portrait`.
+
+- `include_base_layer`
+  can be set to `true` or `false`, determining whether the template/pdf/epub layer is to be included or not in the rendering.
+  Default is `true`.
+
 
 ### Preview options
 
-The `preview` section for now has one option only: `eraser_mode`.
-It can take two values: `"accurate"` or `"quick"` (default is `"quick"`).
-The quick method paints white strokes to render the eraser tool.
-This results in quicker rendering times but inaccurate results: the layers below the strokes would be covered by the eraser which is undesirable.
-The export function always uses the accurate method: clipping the paths to exclude erased areas. Accurate mode is slower to render due to the clipping, so it is optional in preview mode.
+The preview section contains `RENDER_OPTIONS` determining how the previewer will render notebooks.
 
 ```json
 "preview": {
-  "eraser_mode": "quick"
+  RENDER_OPTIONS
 }
 ```
+
+
 ### Export options
 
-The export section has two settings:
+The export section determines the defaults used for exporting notebooks to PDFs.
+In addition to `RENDER_OPTIONS` you can also set the `default_dir` and the `open_exported` settings
 
 ```json
 "export": {
-  "default_dir": "...",
-  "open_exported": true
+  "default_dir": "/path/to/folder",
+  "open_exported": true,
+  RENDER_OPTIONS
 }
 ```
+
+The highlighter colors will be rendered with opacity 50%
+since the PDF exporter of Qt5 does not support blend modes.
+
 
 ### Mathpix options
 
@@ -199,14 +302,14 @@ Only one page at a time can be exported (via context menu in preview) and the da
 
 ## Features
 
-Once the configuration file contains the necessary info, you can run reMy by running
+Once the configuration file contains the necessary info, you can run Remy by running
 
     python remygui.py [SOURCE]
 
 The option is the id of one of the sources defined in the configuration file.
 With no option, the default source will be selected.
 
-The app displays the tree of the files in the main window.
+The app displays the tree of the files in the main window and allows to search by name/type.
 
 ### Preview
 
@@ -217,22 +320,30 @@ Pressing S increases the simplification of the lines, Shift+S decreases it (this
 
 ### Export and rendering
 
-PDFs are rendered at a fixed resolution for quick preview.
+PDFs are rendered in the previewer at a fixed resolution.
 The export function overlays the vectorial data from annotations to the original PDF so the quality of both is preserved.
 
 The rendering of notebooks/annotations has been redeveloped from scratch.
-It features proper handling of eraser/eraser area: other renderers just produce a white fill/stroke but that does not work well with layers nor with annotations on PDFs; for the moment this faster way of dealing with it is used for eraser in preview mode, but the accurate one is used for the export function.
-For the moment the export function simplifies the lines a bit, to achieve smaller sizes.
-This will become a fully customizable parameter once the tool matures.
+Features:
 
-Planned features include: fully parametric rendering to be able to control the colors/style of each element from settings.
+- control over the rendering of eraser (including accurate mode)
+- pencil textures
+- control over layers to be rendered, colors to be used
+- page ranges for export
+- optional simplification and smoothening (experimental)
+
+Planned features include:
+
+- fully parametric rendering to be able to control the colors/style of each element from settings
+- batch export
+- previewer with text recognition, annotations, and rendering options panels
+- text search
+- raster and SVG export
 
 ### Upload
 
-From the tree view, select a folder (or deselect to select the root) and drag and drop on the info panel any PDF (mutiple PDFs at once are supported, folders are planned but not supported yet).
-For the moment, the UI blocks until upload is completed.
-Progress bars coming soon ;)
-
+From the tree view, select a folder (or deselect to select the root) and drag and drop on the info panel any PDF (multiple PDFs/EPUBs at once are supported, folders are planned but not supported yet).
+Alternatively, choose <kbd>Upload Here...</kbd> from the contextual menu of the destination folder.
 
 
 - - -
@@ -262,8 +373,9 @@ by using the `settings` key, for example you could have a per-source default exp
 
 ## Credits
 
-- Icons adapted from designs by Freepik, xnimrodx from www.flaticon.com
-- <a href="https://icons8.com/icon/tj2i6baf72s0/pencil">Pencil icon by Icons8</a>
+- Some icons from [ElementaryOs](https://github.com/elementary/icons)
+- Some icons adapted from designs by Freepik, xnimrodx from www.flaticon.com
+- <a href="https://icons8.com/icon/tj2i6baf72s0/pencil">Pencil spinner by Icons8</a>
 
 ## Disclaimer
 

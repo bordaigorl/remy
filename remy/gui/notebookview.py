@@ -8,7 +8,7 @@ from PyQt5.QtPrintSupport import *
 import remy.remarkable.constants as rm
 from remy.ocr.mathpix import mathpix
 
-from remy.gui.pagerender import PageGraphicsItem, BarePageScene
+from remy.remarkable.render import PageGraphicsItem
 from remy.gui.export import webUIExport, exportDocument
 
 from os import path
@@ -31,6 +31,8 @@ class NotebookViewer(QGraphicsView):
     self.setRenderHint(QPainter.Antialiasing)
     # self.setRenderHint(QPainter.SmoothPixmapTransform)
     # setting this^ per-pixmap now, so pencil textures are not smoothened
+
+    self.viewport().grabGesture(Qt.PinchGesture)
 
     self.document = document
     self.options = QApplication.instance().config.preview
@@ -114,19 +116,20 @@ class NotebookViewer(QGraphicsView):
   def imageOfBasePdf(self, i, mult=1):
     pdf = self.document.baseDocument()
     if pdf:
-      page = pdf.page(i)
-      s = page.pageSize()
-      w, h = s.width(), s.height()
-      if w <= h:
-        ratio = min(WIDTH / w, HEIGHT / h)
-      else:
-        ratio = min(HEIGHT / w, WIDTH / h)
-      xres = 72.0 * ratio * mult
-      yres = 72.0 * ratio * mult
-      if w <= h:
-        return page.renderToImage(xres, yres)
-      else:
-        return page.renderToImage(xres, yres, -1,-1,-1,-1, page.Rotate270)
+      with pdf.lock:
+        page = pdf.page(i)
+        s = page.pageSize()
+        w, h = s.width(), s.height()
+        if w <= h:
+          ratio = min(WIDTH / w, HEIGHT / h)
+        else:
+          ratio = min(HEIGHT / w, WIDTH / h)
+        xres = 72.0 * ratio * mult
+        yres = 72.0 * ratio * mult
+        if w <= h:
+          return page.renderToImage(xres, yres)
+        else:
+          return page.renderToImage(xres, yres, -1,-1,-1,-1, page.Rotate270)
     else:
       return QImage()
 
@@ -140,9 +143,11 @@ class NotebookViewer(QGraphicsView):
     return self._templates[bg.name]
 
   def loadPage(self, i):
-    ermode = self.options.get("eraser_mode", "ignore")
-    pres = self.options.get("pencil_resolution", 0.4)
-    scene = self.makePageScene(i, eraser_mode=ermode, pencil_resolution=pres)
+    # ermode = self.options.get("eraser_mode", "ignore")
+    # pres = self.options.get("pencil_resolution", 0.4)
+    # pal = self.options.get("palette", {})
+    # scene = self.makePageScene(i, eraser_mode=ermode, pencil_resolution=pres, palette=pal)
+    scene = self.makePageScene(i, **self.options)
     self.setScene(scene)
     self._page = i
     self.refreshTitle()
@@ -190,8 +195,11 @@ class NotebookViewer(QGraphicsView):
     r=scene.addRect(0,0,rm.WIDTH, rm.HEIGHT)
     r.setPen(Qt.black)
     if isinstance(self.document, PDFDoc):
-      self._maxPage = self.document.baseDocument().numPages() - 1
-      self.refreshTitle()
+      pdf = self.document.baseDocument()
+      if pdf:
+        with pdf.lock:
+          self._maxPage = pdf.numPages() - 1
+        self.refreshTitle()
 
 
   def resetSize(self, ratio):
@@ -225,6 +233,15 @@ class NotebookViewer(QGraphicsView):
 
   def resizeEvent(self, event):
     self.updateViewer()
+
+  def viewportEvent(self, event):
+    if event.type() == QEvent.Gesture:
+      pinch = event.gesture(Qt.PinchGesture)
+      if pinch is not None:
+        self._fit = False
+        self.scale(pinch.scaleFactor(), pinch.scaleFactor())
+        return True
+    return bool(QGraphicsView.viewportEvent(self, event))
 
   def mouseDoubleClickEvent(self, event):
     # scenePos = self.mapToScene(event.pos())
@@ -300,13 +317,14 @@ class NotebookViewer(QGraphicsView):
     if pageNum is None:
       pageNum = self._page
     page = self.document.getPage(pageNum)
-    c = QApplication.instance().config
     try:
-      r = mathpix(page, c['mathpix']['app_id'], c['mathpix']['app_key'], simplify)
+      c = QApplication.instance().config.get('mathpix')
+      r = mathpix(page, c['app_id'], c['app_key'], simplify)
       txt = QPlainTextEdit(r["text"])
       txt.setParent(self, Qt.Window)
       txt.show()
-    except:
+    except Exception as e:
+      log.error("Mathpix: %s", e)
       QMessageBox.critical(self, "Error",
         "Please check you properly configured your mathpix API keys "
         "in the configuration file.\n\n"
@@ -377,30 +395,31 @@ class AsyncPageLoad(QRunnable):
   def imageOfBasePdf(self, mult=1):
     pdf = self.document.baseDocument()
     if pdf:
-      page = pdf.page(self.pageNum)
-      s = page.pageSize()
-      w, h = s.width(), s.height()
-      if w <= h:
-        ratio = min(WIDTH / w, HEIGHT / h)
-      else:
-        ratio = min(HEIGHT / w, WIDTH / h)
-      xres = 72.0 * ratio * mult
-      yres = 72.0 * ratio * mult
-      if w <= h:
-        return page.renderToImage(xres, yres)
-      else:
-        return page.renderToImage(xres, yres, -1,-1,-1,-1, page.Rotate270)
+      with pdf.lock:
+        page = pdf.page(self.pageNum)
+        s = page.pageSize()
+        w, h = s.width(), s.height()
+        if w <= h:
+          ratio = min(WIDTH / w, HEIGHT / h)
+        else:
+          ratio = min(HEIGHT / w, WIDTH / h)
+        xres = 72.0 * ratio * mult
+        yres = 72.0 * ratio * mult
+        if w <= h:
+          return page.renderToImage(xres, yres)
+        else:
+          return page.renderToImage(xres, yres, -1,-1,-1,-1, page.Rotate270)
     else:
       return QImage()
 
   def run(self):
     page = self.document.getPage(self.pageNum)
     # try:
-    img = QImage()
     if page.background and page.background.name != "Blank":
       page.background.retrieve()
+      img = QImage()
       # images are cached
-    elif self.document.baseDocument():
+    else:
       # todo: adapt the oversampling based on QGraphicsView scale
       img = self.imageOfBasePdf(2)
     p = PageGraphicsItem(page, **self.options)

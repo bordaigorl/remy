@@ -9,7 +9,7 @@ from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 
 from remy.remarkable.config import *
-from remy.remarkable.metadata import *
+from remy.gui.qmetadata import *
 from remy.remarkable.filesource import (
   LocalFileSource,
   LiveFileSourceSSH,
@@ -17,7 +17,7 @@ from remy.remarkable.filesource import (
 )
 import remy.gui.resources
 from remy.gui.notebookview import *
-from remy.gui.filebrowser import *
+from remy.gui.browser import *
 from remy.connect import connect, BadHostKeyException, UnknownHostKeyException
 
 import time
@@ -44,6 +44,7 @@ class RemyApp(QApplication):
     self.setApplicationName('remy')
     self.setApplicationDisplayName('Remy')
     self.setWindowIcon(QIcon(':/assets/remy.svg'))
+    self.setAttribute(Qt.AA_DontShowIconsInMenus, True)
 
     self._makeAppPaths()
     config = self.config = RemyConfig(argv=sys.argv, paths=self.paths)
@@ -63,15 +64,19 @@ class RemyApp(QApplication):
         source, ok = self.sourceSelectionBox()
         if not ok:
           log.error("Sorry, I need a source to work.")
-          sys.exit(2)
+          sys.exit()
       config.selectSource(source)
 
-
-    self.aboutToQuit.connect(self.joinWorkers)
+    self.aboutToQuit.connect(self.cleanup)
+    self.fsource = None
 
   @pyqtSlot()
-  def joinWorkers(self):
+  def cleanup(self):
     QThreadPool.globalInstance().waitForDone()
+    if self.fsource:
+      self.fsource.cleanup()
+      self.fsource.close()
+
 
   def sourceSelectionBox(self):
     sources = self.config.get('sources')
@@ -104,6 +109,7 @@ class RemyApp(QApplication):
   _init = None
   initDialog = None
   def requestInit(self, **overrides):
+    self.fsource = None
     self.setQuitOnLastWindowClosed(False)
     self.initDialog = RemyProgressDialog(label="Loading: ")
     init = RemyInitWorker(*self.config.connectionArgs(**overrides))
@@ -167,7 +173,6 @@ class RemyApp(QApplication):
       mbox.addButton(QMessageBox.Retry)
       mbox.setDefaultButton(QMessageBox.Retry)
     answer = mbox.exec()
-    log.info(answer)
     if answer == QMessageBox.Retry:
       self.requestInit()
     elif answer == QMessageBox.Cancel:
@@ -206,6 +211,7 @@ class RemyApp(QApplication):
     self._init = None
     self.initDialog = None
     self.tree = FileBrowser(index)
+    self.fsource = index.fsource # for cleanup
     self.setQuitOnLastWindowClosed(True)
     log.info("Initialised, launching browser")
 
@@ -331,11 +337,14 @@ class RemyInitWorker(QRunnable):
       self._progress(0,0,"Fetching metadata")
       fsource.prefetchMetadata(progress=self._progress)
       self._progress(0,0,"Building index")
-      index = RemarkableIndex(fsource, progress=self._progress)
+      index = QRemarkableIndex(fsource, progress=self._progress)
       self._progress(4,4,"Done")
       log.info('LOAD TIME: %f', time.perf_counter() - T0)
       self.signals.success.emit(index)
     except RemyInitCancel:
+      if fsource:
+        fsource.cleanup()
+        fsource.close()
       self.signals.canceled.emit()
     except Exception as e:
       self.signals.error.emit(e)
