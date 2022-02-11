@@ -2,6 +2,8 @@
 
 The goal of Remy is to allow simple interaction with the reMarkable tablet over ssh, without needing the cloud service, nor the USB Web UI.
 
+![Screenshot](assets/screenshot.png)
+
 
 **BEWARE**
 
