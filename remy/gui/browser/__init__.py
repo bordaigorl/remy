@@ -15,6 +15,7 @@ from remy.gui.browser.info import InfoPanel
 from remy.gui.browser.doctree import *
 from remy.gui.browser.workers import *
 from remy.gui.browser.search import *
+from remy.gui.browser.folderselect import *
 
 # I could have used QWidget.addAction to attach these to the tree/main window
 # but this way I get a bit more flexibility
@@ -110,6 +111,7 @@ class Actions:
   def setLive(self, b):
     self._isLive = b
     self.upload.setVisible(b)
+    self.moveTo.setVisible(b)
     self.rename.setVisible(b)
     self.addToPinned.setVisible(b)
     self.remFromPinned.setVisible(b)
@@ -178,6 +180,7 @@ class Actions:
       self.newFolderWith,
       # self.SEPARATOR,
       self.rename,
+      self.moveTo,
       self.addToPinned,
       self.remFromPinned,
       self.SEPARATOR,
@@ -298,6 +301,7 @@ class FileBrowser(QMainWindow):
     a.newFolder.triggered.connect(self.newFolder)
     a.newFolderWith.triggered.connect(self.newFolderWith)
     a.rename.triggered.connect(self.editCurrent)
+    a.moveTo.triggered.connect(self.moveCurrentTo)
     a.addToPinned.triggered.connect(self.pinSelected)
     a.remFromPinned.triggered.connect(self.unpinSelected)
     a.upload.triggered.connect(self.uploadIntoCurrentEntry)
@@ -462,6 +466,13 @@ class FileBrowser(QMainWindow):
                                       "Name of new folder:", text="New Folder")
       if ok and name:
         NewFolderWorker(self.index, parent=entry.uid, visibleName=name).start()
+
+  @pyqtSlot()
+  def moveCurrentTo(self):
+    uids = set(item.entry().uid for item in self.tree.selectedItems())
+    dest = FolderSelectDialog.getDestinationFolder(self.index, parent=self, exclude=uids)
+    if dest:
+      self.index.moveAll(uids, dest)
 
   @pyqtSlot()
   def deleteSelected(self):
