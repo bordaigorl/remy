@@ -2,7 +2,7 @@
 
 The goal of Remy is to allow simple interaction with the reMarkable tablet over ssh, without needing the cloud service, nor the USB Web UI.
 
-![Screenshot](assets/screenshot.png)
+![Screenshot](assets/screenshot.jpg)
 
 
 **BEWARE**
@@ -45,7 +45,7 @@ The following works on MacOs (Catalina), assuming `python` version 3.8 (if not, 
 
 ```bash
 # Build dependencies
-brew install cmake poppler
+brew install cmake poppler-qt5
 # Install regular dependencies
 pip install requests arrow paramiko PyPDF2 PyQt5 simplification sip
 # Install python-poppler-qt5 using SIP5
