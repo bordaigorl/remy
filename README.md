@@ -23,7 +23,7 @@ For a basic backup of the tablet's data:
 
 ## Installation
 
-The installation process is a bit less straightforward than ideal because `python-poppler-qt5` has [broken installation scripts](https://github.com/frescobaldi/python-poppler-qt5/pull/41).
+The installation process is a bit less straightforward than ideal because `python-poppler-qt5` has [broken installation scripts](https://github.com/frescobaldi/python-poppler-qt5/pull/45).
 
 The requirements are:
 
@@ -47,7 +47,7 @@ brew install cmake poppler
 # Install regular dependencies
 pip install requests arrow paramiko PyPDF2 PyQt5 simplification sip
 # Install python-poppler-qt5 using SIP5
-pip install git+https://github.com/mitya57/python-poppler-qt5.git@sip5
+pip install git+git://github.com/frescobaldi/python-poppler-qt5@92e5962ec3751ab051d0b655fd61afc7a1cf709e
 ```
 
 
