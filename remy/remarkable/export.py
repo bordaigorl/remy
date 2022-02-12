@@ -69,14 +69,11 @@ def pdfrotate(outputPath, rotate=0):
     writer.write(out)
 
 
-def pdfmerge(basePath, outputPath, pdfRanges=None, rotate=0, progress=None):
-  if isinstance(basePath, PdfFileReader):
-    baseReader = basePath
-  else:
-    baseReader = PdfFileReader(basePath, strict=False)
+def pdfmerge(base, outputPath, pdfRanges=None, rotate=0, progress=None):
+  baseReader = PdfFileReader(base.path(), strict=False)
   annotReader = PdfFileReader(outputPath, strict=False)
   if pdfRanges is None:
-    pageNum = min(baseReader.getNumPages(), annotReader.getNumPages())
+    pageNum = annotReader.getNumPages() #min(baseReader.getNumPages(), annotReader.getNumPages())
     pdfRanges = range(pageNum)
   else:
     pageNum = sum(len(r) for r in pdfRanges)
@@ -84,32 +81,36 @@ def pdfmerge(basePath, outputPath, pdfRanges=None, rotate=0, progress=None):
   writer = TolerantPdfWriter()
   _progress(progress, 0, pageNum + 1)
   for apage, page in enumerate(pdfRanges):
-    bp = baseReader.getPage(page)
     ap = annotReader.getPage(apage)
-
-    s = ap.cropBox or ap.artBox
-    aw, ah = s.upperRight[0] - s.upperLeft[0], s.upperLeft[1] - s.lowerLeft[1]
-    s = bp.cropBox or bp.artBox
-    w, h = s.upperRight[0] - s.upperLeft[0], s.upperLeft[1] - s.lowerLeft[1]
-
-    np = PageObject.createBlankPage(writer, aw, ah)
-    if w <= h:
-      ratio = min(aw / w, ah / h)
-      tx = 0
-      ty = ah - ( h * ratio )
-      rot = 0
+    bpage = base.originalPageNum(page)
+    if bpage is None:
+      writer.addPage(ap)
     else:
-      w, h = h, w
-      ratio = min(aw / w, ah / h)
-      tx = w * ratio
-      ty = ah - ( h * ratio )
-      rot = 90
-    np.mergeRotatedScaledTranslatedPage(bp, rot, ratio, tx, ty)
-    np.mergePage(ap)
-    if rotate:
-      np.rotateCounterClockwise(rotate)
+      bp = baseReader.getPage(bpage)
 
-    writer.addPage(np)
+      s = ap.cropBox or ap.artBox
+      aw, ah = s.upperRight[0] - s.upperLeft[0], s.upperLeft[1] - s.lowerLeft[1]
+      s = bp.cropBox or bp.artBox
+      w, h = s.upperRight[0] - s.upperLeft[0], s.upperLeft[1] - s.lowerLeft[1]
+
+      np = PageObject.createBlankPage(writer, aw, ah)
+      if w <= h:
+        ratio = min(aw / w, ah / h)
+        tx = 0
+        ty = ah - ( h * ratio )
+        rot = 0
+      else:
+        w, h = h, w
+        ratio = min(aw / w, ah / h)
+        tx = w * ratio
+        ty = ah - ( h * ratio )
+        rot = 90
+      np.mergeRotatedScaledTranslatedPage(bp, rot, ratio, tx, ty)
+      np.mergePage(ap)
+      if rotate:
+        np.rotateCounterClockwise(rotate)
+
+      writer.addPage(np)
     _progress(progress, page, pageNum + 1)
 
   writer.removeLinks() # until we implement transformations on annotations
@@ -228,8 +229,8 @@ class Exporter(QThread):
       pdf = None
       if isinstance(self.document, PDFBasedDoc) and self.options.get('include_base_layer', True):
         pdf = self.document.retrieveBaseDocument()
-        baseReader = PdfFileReader(pdf, strict=False)
-        totPages = baseReader.getNumPages()
+        # baseReader = PdfFileReader(pdf, strict=False)
+        # totPages = baseReader.getNumPages()
 
       rot = self.options.get("orientation", "auto")
       if rot == "auto":
@@ -260,7 +261,7 @@ class Exporter(QThread):
       scenesPdf(self.genScenes, pages, self.filename, progress=self._progress, tot=steps)
       if pdf:
         self.onNewPhase.emit("Merging with original PDF")
-        pdfmerge(pdf, self.filename, pdfRanges=ranges, rotate=90 if rot else 0, progress=self._progress)
+        pdfmerge(self.document.baseDocument(), self.filename, pdfRanges=ranges, rotate=90 if rot else 0, progress=self._progress)
       elif rot:
         pdfrotate(self.filename, 90)
 

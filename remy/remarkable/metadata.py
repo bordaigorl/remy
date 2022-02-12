@@ -10,6 +10,7 @@ from pathlib import Path
 
 from remy.remarkable.lines import *
 from remy.remarkable.constants import *
+from remy.remarkable.pdfbase import PDFBase
 from remy.utils import deepupdate
 from copy import deepcopy
 
@@ -322,8 +323,11 @@ class Notebook(Document):
 
 class PDFBasedDoc(Document):
 
-  _pdf = None
-  _pdf_lock = RLock()
+  # _pdf = None
+  # _pdf_lock = RLock()
+
+  def _postInit(self):
+    self._pdf = PDFBase(self)
 
   def _makePage(self, layers, version, pageNum):
     return Page(layers, version, pageNum, document=self)
@@ -347,21 +351,6 @@ class PDFBasedDoc(Document):
     return b and self.fsource.exists(b)
 
   def baseDocument(self):
-    from popplerqt5 import Poppler
-    with self._pdf_lock:
-      if self._pdf is None:
-        doc = self.retrieveBaseDocument()
-        if doc is None:
-          log.warning("Base document for %s could not be found", self.uid)
-          return None
-        self._pdf = Poppler.Document.load(doc)
-        self._pdf.lock = RLock()
-        self._pdf.setRenderHint(Poppler.Document.Antialiasing)
-        self._pdf.setRenderHint(Poppler.Document.TextAntialiasing)
-        try:
-          self._pdf.setRenderHint(Poppler.Document.HideAnnotations)
-        except Exception:
-          pass
     return self._pdf
 
   def baseDocumentName(self):

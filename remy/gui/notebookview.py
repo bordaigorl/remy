@@ -113,25 +113,25 @@ class NotebookViewer(QGraphicsView):
     else:
       self.resetSize(HEIGHT / WIDTH)
 
-  def imageOfBasePdf(self, i, mult=1):
-    pdf = self.document.baseDocument()
-    if pdf:
-      with pdf.lock:
-        page = pdf.page(i)
-        s = page.pageSize()
-        w, h = s.width(), s.height()
-        if w <= h:
-          ratio = min(WIDTH / w, HEIGHT / h)
-        else:
-          ratio = min(HEIGHT / w, WIDTH / h)
-        xres = 72.0 * ratio * mult
-        yres = 72.0 * ratio * mult
-        if w <= h:
-          return page.renderToImage(xres, yres)
-        else:
-          return page.renderToImage(xres, yres, -1,-1,-1,-1, page.Rotate270)
-    else:
-      return QImage()
+  # def imageOfBasePdf(self, i, mult=1):
+  #   pdf = self.document.baseDocument()
+  #   if pdf:
+  #     with pdf.lock:
+  #       page = pdf.page(i)
+  #       s = page.pageSize()
+  #       w, h = s.width(), s.height()
+  #       if w <= h:
+  #         ratio = min(WIDTH / w, HEIGHT / h)
+  #       else:
+  #         ratio = min(HEIGHT / w, WIDTH / h)
+  #       xres = 72.0 * ratio * mult
+  #       yres = 72.0 * ratio * mult
+  #       if w <= h:
+  #         return page.renderToImage(xres, yres)
+  #       else:
+  #         return page.renderToImage(xres, yres, -1,-1,-1,-1, page.Rotate270)
+  #   else:
+  #     return QImage()
 
   def imageOfBackground(self, bg):
     if bg and bg.name not in self._templates:
@@ -194,12 +194,6 @@ class NotebookViewer(QGraphicsView):
     scene.setSceneRect(scene.pageRect.rect())
     r=scene.addRect(0,0,rm.WIDTH, rm.HEIGHT)
     r.setPen(Qt.black)
-    if isinstance(self.document, PDFDoc):
-      pdf = self.document.baseDocument()
-      if pdf:
-        with pdf.lock:
-          self._maxPage = pdf.numPages() - 1
-        self.refreshTitle()
 
 
   def resetSize(self, ratio):
@@ -395,20 +389,7 @@ class AsyncPageLoad(QRunnable):
   def imageOfBasePdf(self, mult=1):
     pdf = self.document.baseDocument()
     if pdf:
-      with pdf.lock:
-        page = pdf.page(self.pageNum)
-        s = page.pageSize()
-        w, h = s.width(), s.height()
-        if w <= h:
-          ratio = min(WIDTH / w, HEIGHT / h)
-        else:
-          ratio = min(HEIGHT / w, WIDTH / h)
-        xres = 72.0 * ratio * mult
-        yres = 72.0 * ratio * mult
-        if w <= h:
-          return page.renderToImage(xres, yres)
-        else:
-          return page.renderToImage(xres, yres, -1,-1,-1,-1, page.Rotate270)
+      return pdf.toImage(self.pageNum, 72.0 * mult)
     else:
       return QImage()
 
