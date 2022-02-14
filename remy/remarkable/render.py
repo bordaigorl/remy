@@ -264,12 +264,12 @@ class PageGraphicsItem(QGraphicsRectItem):
 
         # WIDTH CALCULATION
         if tool == rm.PENCIL_TOOL:
-          if pencil_resolution:
+          if pencil_resolution > 0:
             calcwidth = pencil_width
           else:
             calcwidth = flat_pencil_width
         elif tool == rm.MECH_PENCIL_TOOL:
-          if pencil_resolution:
+          if pencil_resolution > 0:
             calcwidth = mech_pencil_width
           else:
             calcwidth = flat_mech_pencil_width
@@ -353,7 +353,7 @@ class PageGraphicsItem(QGraphicsRectItem):
               for s in segments:
                 path.lineTo(s.x,s.y)
 
-              if pencil_resolution and tool == rm.PENCIL_TOOL and p:
+              if pencil_resolution > 0 and tool == rm.PENCIL_TOOL and p:
                 # draw fuzzy edges
                 item=QGraphicsPathItem(path, group)
                 pen.setBrush(pencilBrushes().getBrush(int(p*.7), scale=pencil_resolution))
@@ -362,12 +362,13 @@ class PageGraphicsItem(QGraphicsRectItem):
 
               pen.setWidthF(w)
               if p is not None:
-                if pencil_resolution:
+                if pencil_resolution > 0:
                   pen.setBrush(pencilBrushes().getBrush(p, scale=pencil_resolution))
-                else:
+                elif pencil_resolution == 0:
                   pen.setColor(QColor(int(p*255),int(p*255),int(p*255)))
+                else:
+                  pen.setColor(palette.get('black'))
               if tool == rm.HIGHLIGHTER_TOOL: # and k.color != 1:
-                # log.warn('Hello %s', k.color)
                 PathItem = QGraphicsPathItemD
               else:
                 PathItem = QGraphicsPathItem

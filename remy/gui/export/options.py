@@ -133,6 +133,7 @@ class ExportDialog(QDialog):
     pencilMode = self.pencilMode = QComboBox()
     pencilMode.addItem("Textured", 1)
     pencilMode.addItem("Grayscale", 0)
+    pencilMode.addItem("Solid black", -1)
     form.addRow("Pencil mode:", pencilMode)
 
     layout = QVBoxLayout()
@@ -186,7 +187,7 @@ class ExportDialog(QDialog):
 
     self.smoothen.setChecked(self.options.get("smoothen", False))
     self.tolerance.setValue(self.options.get("simplify", 0))
-    colors = self.options.get("colors", {})
+    # colors = self.options.get("colors", {})
     # self.black.setColor(QColor(colors.get("black", DEFAULT_COLORS[0])))
     # self.gray.setColor(QColor(colors.get("gray", DEFAULT_COLORS[1])))
     # self.white.setColor(QColor(colors.get("white", DEFAULT_COLORS[2])))
