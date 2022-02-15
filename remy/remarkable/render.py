@@ -183,7 +183,8 @@ class PageGraphicsItem(QGraphicsRectItem):
       eraser_mode=AUTO_ERASER,
       parent=None,
       progress=None,
-      exclude_layers=set()
+      exclude_layers=set(),
+      exclude_tools=set()
   ):
     super().__init__(0,0,rm.WIDTH,rm.HEIGHT,parent)
 
@@ -250,7 +251,9 @@ class PageGraphicsItem(QGraphicsRectItem):
 
       for k in l.strokes:
         tool = rm.TOOL_ID.get(k.pen)
-        # print(rm.TOOL_NAME.get(tool))
+        if tool in exclude_tools:
+          # log.info("Ignoring %s", rm.TOOL_NAME.get(tool))
+          continue
 
         # COLOR
         if tool == rm.ERASER_TOOL:
