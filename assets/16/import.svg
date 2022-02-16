@@ -1,6 +1,23 @@
-<svg height='16' width='16' xmlns='http://www.w3.org/2000/svg'>
-    <g color='#bebebe' transform='translate(-553 35)'>
-        
-        <path d='M566-33s1 0 1 1v3h-1v-2.5s0-.5-.5-.5h-9s-.5 0-.5.5v9c0 .5.5.5.5.5h9s.5 0 .5-.5V-25h1v3c0 1-1 1-1 1h-10s-1 0-1-1v-10c0-1 1-1 1-1zm-2.568 3.035c.267-.013.559.188.567.465v1.5h3.5c.262 0 .5.238.5.5v1a.489.489 0 0 1 0 .094.517.517 0 0 1-.5.406h-3.5v1.5c-.012.369-.525.606-.813.375l-3-2.5a.522.522 0 0 1 0-.75l3-2.5a.418.418 0 0 1 .246-.09z' fill='#666' overflow='visible' style='marker:none'/>
-    </g>
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="16" height="16" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+ <defs>
+  <linearGradient id="linearGradient3092" x1="-51.786" x2="-51.786" y1="50.786" y2="2.9062" gradientTransform="matrix(.25379 0 0 .30502 19.129 -.68548)" gradientUnits="userSpaceOnUse">
+   <stop stop-opacity=".33951" offset="0"/>
+   <stop stop-opacity=".24691" offset="1"/>
+  </linearGradient>
+  <linearGradient id="linearGradient3095" x1="24" x2="24" y1="6.9231" y2="41.077" gradientTransform="matrix(.24324 0 0 .35135 2.1622 -.43243)" gradientUnits="userSpaceOnUse">
+   <stop stop-color="#fff" offset="0"/>
+   <stop stop-color="#fff" stop-opacity=".23529" offset="0"/>
+   <stop stop-color="#fff" stop-opacity=".15686" offset="1"/>
+   <stop stop-color="#fff" stop-opacity=".39216" offset="1"/>
+  </linearGradient>
+  <linearGradient id="linearGradient3940" x1="25.132" x2="25.132" y1=".98521" y2="47.013" gradientTransform="matrix(.28571 0 0 .3042 1.1429 .2326)" gradientUnits="userSpaceOnUse">
+   <stop stop-color="#f4f4f4" offset="0"/>
+   <stop stop-color="#dbdbdb" offset="1"/>
+  </linearGradient>
+ </defs>
+ <path d="m3 1c2.2915 0 10 8.904e-4 10 8.904e-4l1.2e-5 13.999h-10v-14z" fill="url(#linearGradient3940)"/>
+ <path d="m12.5 14.5h-9v-13h9z" fill="none" stroke="url(#linearGradient3095)" stroke-linecap="round"/>
+ <path d="m2.5 0.49997c2.5207 0 11 9.54e-4 11 9.54e-4l1.3e-5 14.999h-11c0-5 0-10 1e-7 -15z" fill="none" stroke="url(#linearGradient3092)" stroke-linejoin="round" stroke-width=".99992"/>
+ <path d="m7 12.5h2v-3h2.5l-3.5-4.5-3.5 4.5h2.5z" fill="#68b723"/>
 </svg>

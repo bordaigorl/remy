@@ -11,6 +11,7 @@ log = logging.getLogger('remy')
 
 from remy.utils import deepupdate
 
+from remy.remarkable.constants import TOOL_NAME_ID
 
 AppPaths = namedtuple('AppPaths', ['config_dir', 'config', 'known_hosts', 'cache_dir'])
 noPaths = AppPaths(None,None,None,None)
@@ -42,6 +43,15 @@ OPTIONS_DEFAULTS = {
   },
   "palettes": {
     "default": {}
+  },
+  "mathpix": {
+    "include_base_layer": False,
+    "pencil_resolution" :  -1,
+    "scale": 1,
+    "simplify": 0,
+    "smoothen": False,
+    "eraser_mode": "ignore",
+    "exclude_tools": ["brush", "pencil", "highlighter", "eraser", "erase_area"]
   }
 }
 
@@ -141,6 +151,12 @@ class RemyConfig():
       raise RemyConfigException("Option '%s' not found in configuration." % opt)
     return default
 
+  def renderOptionsFrom(self, key):
+    opt = deepcopy(self.get(key))
+    opt['palette'] = self.palettes.get(opt.get('palette', 'default'))
+    opt['exclude_tools'] = set(TOOL_NAME_ID.get(t) for t in opt.get('exclude_tools', []) if t in TOOL_NAME_ID)
+    return opt
+
   @property
   def palettes(self):
     if self._palettes is None:
@@ -151,19 +167,19 @@ class RemyConfig():
 
   @property
   def export(self):
-    opt = deepcopy(self._config['export'])
-    opt['palette'] = self.palettes.get(opt.get('palette', 'default'))
-    return opt
+    return self.renderOptionsFrom('export')
 
   @property
-  def import_(self):
-    return deepcopy(self._config['import'])
+  def mathpix(self):
+    return self.renderOptionsFrom('mathpix')
+
+  @property
+  def upload(self):
+    return self.renderOptionsFrom('upload')
 
   @property
   def preview(self):
-    opt = deepcopy(self._config['preview'])
-    opt['palette'] = self.palettes.get(opt.get('palette', 'default'))
-    return opt
+    return deepcopy(self.get('preview'))
 
   def set(self, opt, v):
     self._config[opt] = v

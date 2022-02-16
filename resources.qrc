@@ -16,6 +16,19 @@
     <file>assets/16/pdf.svg</file>
     <file>assets/16/rename.svg</file>
     <file>assets/16/trash.svg</file>
+    <file>assets/16/go-first.svg</file>
+    <file>assets/16/go-last.svg</file>
+    <file>assets/16/go-next.svg</file>
+    <file>assets/16/go-previous.svg</file>
+    <file>assets/16/reload.svg</file>
+    <file>assets/16/rotate-ccw.svg</file>
+    <file>assets/16/rotate-cw.svg</file>
+    <file>assets/16/zoom-fit-best.svg</file>
+    <file>assets/16/zoom-in.svg</file>
+    <file>assets/16/zoom-original.svg</file>
+    <file>assets/16/zoom-out.svg</file>
+    <file>assets/16/webui.svg</file>
+    <file>assets/16/text.svg</file>
     <file>assets/24/trash.svg</file>
     <file>assets/24/folder.svg</file>
     <file>assets/24/notebook.svg</file>
