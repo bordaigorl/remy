@@ -6,26 +6,60 @@ from PyQt5.QtCore import *
 from PyQt5.QtPrintSupport import *
 
 import remy.remarkable.constants as rm
-from remy.ocr.mathpix import mathpix
 
 from remy.remarkable.render import PageGraphicsItem
-from remy.gui.export import webUIExport, exportDocument
+from remy.gui.export import exportDocument
 
 from os import path
 
-import time
 import logging
 log = logging.getLogger('remy')
 
 
+class Actions:
 
-class NotebookViewer(QGraphicsView):
+  def __init__(self, parent=None):
+
+    self.export = QAction('Export document...', parent)
+    self.export.setIcon(QIcon(":assets/16/export.svg"))
+    # TODO
+    self.reload = QAction('Reload', parent)
+    self.reload.setIcon(QIcon(":assets/16/reload.svg"))
+    ###
+    self.prevPage = QAction('Previous Page', parent)
+    self.prevPage.setIcon(QIcon(":assets/16/go-previous.svg"))
+    self.nextPage = QAction('Next Page', parent)
+    self.nextPage.setIcon(QIcon(":assets/16/go-next.svg"))
+    self.firstPage = QAction('First Page', parent)
+    self.firstPage.setIcon(QIcon(":assets/16/go-first.svg"))
+    self.lastPage = QAction('Last Page', parent)
+    self.lastPage.setIcon(QIcon(":assets/16/go-last.svg"))
+    self.fitToView = QAction('Fit to view', parent, checkable=True)
+    self.fitToView.setIcon(QIcon(":assets/16/zoom-fit-best.svg"))
+    self.actualSize = QAction('Actual Size', parent)
+    self.actualSize.setIcon(QIcon(":assets/16/zoom-original.svg"))
+    self.zoomIn = QAction('Zoom In', parent)
+    self.zoomIn.setIcon(QIcon(":assets/16/zoom-in.svg"))
+    self.zoomOut = QAction('Zoom Out', parent)
+    self.zoomOut.setIcon(QIcon(":assets/16/zoom-out.svg"))
+    self.rotateCW = QAction('Rotate clockwise', parent)
+    self.rotateCW.setIcon(QIcon(":assets/16/rotate-cw.svg"))
+    self.rotateCCW = QAction('Rotate counter-clockwise', parent)
+    self.rotateCCW.setIcon(QIcon(":assets/16/rotate-ccw.svg"))
+
+
+class NotebookView(QGraphicsView):
 
   zoomInFactor = 1.25
   zoomOutFactor = 1 / zoomInFactor
 
-  def __init__(self, document):
-    QGraphicsView.__init__(self)
+  pageChanged = pyqtSignal(int, int)
+  resetSize = pyqtSignal(float)
+
+  def __init__(self, document, parent=None):
+    QGraphicsView.__init__(self, parent=parent)
+    self.actions = Actions(self)
+    self._connectActions()
     # self.setAttribute(Qt.WA_OpaquePaintEvent, True)
 
     self.setRenderHint(QPainter.Antialiasing)
@@ -34,7 +68,7 @@ class NotebookViewer(QGraphicsView):
 
     self.viewport().grabGesture(Qt.PinchGesture)
 
-    self.document = document
+    self._document = document
     self.options = QApplication.instance().config.preview
     # document.prefetch()
     # self.uid = uid
@@ -49,50 +83,17 @@ class NotebookViewer(QGraphicsView):
     self.setAlignment(Qt.AlignCenter)
 
     self.menu = QMenu(self)
-    ###
-    act = QAction('Export document...', self)
-    act.triggered.connect(lambda: self.export())
-    self.menu.addAction(act)
-    ###
-    if QApplication.instance().config.get('enable_webui_export'):
-      act = QAction('PDF from WebUI...', self)
-      act.triggered.connect(lambda: self.webUIExport())
-      self.menu.addAction(act)
+    a = self.actions
+    self.menu.addAction(a.export)
     ###
     self.menu.addSeparator() # --------------------------
-    ###
-    act = QAction('Convert page with Mathpix...', self)
-    act.triggered.connect(lambda: self.mathpix())
-    self.menu.addAction(act)
-    ###
+    self.menu.addAction(a.fitToView)
+    self.menu.addAction(a.actualSize)
+    self.menu.addAction(a.zoomIn)
+    self.menu.addAction(a.zoomOut)
     self.menu.addSeparator() # --------------------------
-    ###
-    act = QAction('Fit to view', self, checkable=True)
-    self.fitAction = act
-    act.triggered.connect(lambda: self.setFit(True))
-    self.menu.addAction(act)
-    ###
-    act = QAction('Actual Size', self)
-    act.triggered.connect(lambda: self.actualSize())
-    self.menu.addAction(act)
-    ###
-    act = QAction('Zoom In', self)
-    act.triggered.connect(self.zoomIn)
-    self.menu.addAction(act)
-    ###
-    act = QAction('Zoom Out', self)
-    act.triggered.connect(self.zoomOut)
-    self.menu.addAction(act)
-    ###
-    self.menu.addSeparator() # --------------------------
-    ###
-    act = QAction('Rotate clockwise', self)
-    act.triggered.connect(self.rotateCW)
-    self.menu.addAction(act)
-    ###
-    act = QAction('Rotate counter-clockwise', self)
-    act.triggered.connect(self.rotateCCW)
-    self.menu.addAction(act)
+    self.menu.addAction(a.rotateCW)
+    self.menu.addAction(a.rotateCCW)
 
     self._fit = True
     self._rotation = 0 # used to produce a rotated screenshot
@@ -104,34 +105,28 @@ class NotebookViewer(QGraphicsView):
     self._maxPage = document.pageCount - 1
     # if isinstance(document, PDFDoc):
     #   self._maxPage = document.baseDocument().numPages() - 1
-    self.loadPage(document.lastOpenedPage or 0)
+    self._loadPage(document.lastOpenedPage or 0)
 
     self.show()
     if document.orientation == "landscape":
       self.rotateCW()
-      self.resetSize(WIDTH / HEIGHT)
+      self.resetSize.emit(WIDTH / HEIGHT)
     else:
-      self.resetSize(HEIGHT / WIDTH)
+      self.resetSize.emit(HEIGHT / WIDTH)
 
-  def imageOfBasePdf(self, i, mult=1):
-    pdf = self.document.baseDocument()
-    if pdf:
-      with pdf.lock:
-        page = pdf.page(i)
-        s = page.pageSize()
-        w, h = s.width(), s.height()
-        if w <= h:
-          ratio = min(WIDTH / w, HEIGHT / h)
-        else:
-          ratio = min(HEIGHT / w, WIDTH / h)
-        xres = 72.0 * ratio * mult
-        yres = 72.0 * ratio * mult
-        if w <= h:
-          return page.renderToImage(xres, yres)
-        else:
-          return page.renderToImage(xres, yres, -1,-1,-1,-1, page.Rotate270)
-    else:
-      return QImage()
+  def _connectActions(self):
+    a = self.actions
+    a.export.triggered.connect(lambda: self.export())
+    a.fitToView.triggered.connect(lambda: self.setFit(True))
+    a.actualSize.triggered.connect(lambda: self.actualSize())
+    a.zoomIn.triggered.connect(self.zoomIn)
+    a.zoomOut.triggered.connect(self.zoomOut)
+    a.rotateCW.triggered.connect(self.rotateCW)
+    a.rotateCCW.triggered.connect(self.rotateCCW)
+    a.prevPage.triggered.connect(self.prevPage)
+    a.nextPage.triggered.connect(self.nextPage)
+    a.firstPage.triggered.connect(self.firstPage)
+    a.lastPage.triggered.connect(self.lastPage)
 
   def imageOfBackground(self, bg):
     if bg and bg.name not in self._templates:
@@ -142,15 +137,17 @@ class NotebookViewer(QGraphicsView):
         return None
     return self._templates[bg.name]
 
-  def loadPage(self, i):
+  def _loadPage(self, i):
     # ermode = self.options.get("eraser_mode", "ignore")
     # pres = self.options.get("pencil_resolution", 0.4)
     # pal = self.options.get("palette", {})
     # scene = self.makePageScene(i, eraser_mode=ermode, pencil_resolution=pres, palette=pal)
     scene = self.makePageScene(i, **self.options)
     self.setScene(scene)
+    old_page = self._page
     self._page = i
-    self.refreshTitle()
+    # self.refreshTitle()
+    self.pageChanged.emit(old_page+1, self._page+1)
 
   def makePageScene(self, i, **options):
     if i in self._page_cache:
@@ -169,7 +166,7 @@ class NotebookViewer(QGraphicsView):
     scene.loadingItem.setPos(r.rect().center())
 
 
-    w = AsyncPageLoad(self.document, i, **options)
+    w = AsyncPageLoad(self._document, i, **options)
     w.signals.pageReady.connect(self.pageReady)
     QThreadPool.globalInstance().start(w)
     return scene
@@ -194,36 +191,62 @@ class NotebookViewer(QGraphicsView):
     scene.setSceneRect(scene.pageRect.rect())
     r=scene.addRect(0,0,rm.WIDTH, rm.HEIGHT)
     r.setPen(Qt.black)
-    if isinstance(self.document, PDFDoc):
-      pdf = self.document.baseDocument()
-      if pdf:
-        with pdf.lock:
-          self._maxPage = pdf.numPages() - 1
-        self.refreshTitle()
 
 
-  def resetSize(self, ratio):
-    dg = QApplication.desktop().availableGeometry(self)
-    ds = dg.size() * 0.6
-    if ds.width() * ratio > ds.height():
-      ds.setWidth(int(ds.height() / ratio))
-    else:
-      ds.setHeight(int(ds.width() * ratio))
-    self.resize(ds)
+  # def resetSize.emit(self, ratio):
+  #   dg = QApplication.desktop().availableGeometry(self.window())
+  #   ds = dg.size() * 0.6
+  #   if ds.width() * ratio > ds.height():
+  #     ds.setWidth(int(ds.height() / ratio))
+  #   else:
+  #     ds.setHeight(int(ds.width() * ratio))
+  #   self.window().resize(ds)
+
+  def document(self):
+    return self._document
+
+  def currentPage(self):
+    return self._document.getPage(self._page)
+
+  def currentPageNum(self):
+    return self._page+1
+
+  def currentPageIndex(self):
+    return self._page
+
+  def maximumPageNum(self):
+    return self._maxPage+1
+
+  def setCurrentPageNum(self, p):
+    p -= 1
+    if p >= 0 and p <= self._maxPage:
+      self._loadPage(p)
+      return True
+    return False
+
+  def firstPage(self):
+    self._loadPage(0)
+
+  def lastPage(self):
+    self._loadPage(self._maxPage)
 
   def nextPage(self):
     if self._page < self._maxPage:
-      self.loadPage(self._page + 1)
+      self._loadPage(self._page + 1)
+      return True
+    return False
 
   def prevPage(self):
     if self._page > 0:
-      self.loadPage(self._page - 1)
+      self._loadPage(self._page - 1)
+      return True
+    return False
 
-  def refreshTitle(self):
-    self.setWindowTitle("%s - Page %d of %d" % (self.document.visibleName, self._page + 1, self._maxPage +1))
+  # def refreshTitle(self):
+  #   self.window().setWindowTitle("%s - Page %d of %d" % (self._document.visibleName, self._page + 1, self._maxPage +1))
 
   def contextMenuEvent(self, event):
-    self.fitAction.setChecked(self._fit)
+    self.actions.fitToView.setChecked(self._fit)
     self.menu.exec_(self.mapToGlobal(event.pos()))
 
   def updateViewer(self):
@@ -308,28 +331,8 @@ class NotebookViewer(QGraphicsView):
     self.rotate(self._rotation)
 
   def export(self):
-    exportDocument(self.document, self)
+    exportDocument(self._document, self)
 
-  def webUIExport(self, filename=None):
-    webUIExport(self.document, filename, self)
-
-  def mathpix(self, pageNum=None, simplify=True):
-    if pageNum is None:
-      pageNum = self._page
-    page = self.document.getPage(pageNum)
-    try:
-      c = QApplication.instance().config.get('mathpix')
-      r = mathpix(page, c['app_id'], c['app_key'], simplify)
-      txt = QPlainTextEdit(r["text"])
-      txt.setParent(self, Qt.Window)
-      txt.show()
-    except Exception as e:
-      log.error("Mathpix: %s", e)
-      QMessageBox.critical(self, "Error",
-        "Please check you properly configured your mathpix API keys "
-        "in the configuration file.\n\n"
-        "Instructions to obtain API keys at\n"
-        "https://mathpix.com/ocr")
 
 
   _tolerance = {}
@@ -340,14 +343,14 @@ class NotebookViewer(QGraphicsView):
       self.close()
     elif event.key() == Qt.Key_Left:
       if event.modifiers() & Qt.ControlModifier:
-        self.loadPage(0)
+        self._loadPage(0)
       elif event.modifiers() & Qt.MetaModifier:
         self.rotateCCW()
       else:
         self.prevPage()
     elif event.key() == Qt.Key_Right:
       if event.modifiers() & Qt.ControlModifier:
-        self.loadPage(self._maxPage)
+        self._loadPage(self._maxPage)
       elif event.modifiers() & Qt.MetaModifier:
         self.rotateCW()
       else:
@@ -395,20 +398,7 @@ class AsyncPageLoad(QRunnable):
   def imageOfBasePdf(self, mult=1):
     pdf = self.document.baseDocument()
     if pdf:
-      with pdf.lock:
-        page = pdf.page(self.pageNum)
-        s = page.pageSize()
-        w, h = s.width(), s.height()
-        if w <= h:
-          ratio = min(WIDTH / w, HEIGHT / h)
-        else:
-          ratio = min(HEIGHT / w, WIDTH / h)
-        xres = 72.0 * ratio * mult
-        yres = 72.0 * ratio * mult
-        if w <= h:
-          return page.renderToImage(xres, yres)
-        else:
-          return page.renderToImage(xres, yres, -1,-1,-1,-1, page.Rotate270)
+      return pdf.toImage(self.pageNum, 72.0 * mult)
     else:
       return QImage()
 

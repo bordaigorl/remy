@@ -373,7 +373,7 @@ class FileBrowser(QMainWindow):
 
   @pyqtSlot(str, list,list)
   def _requestUpload(self, p, dirs, files):
-    opt = QApplication.instance().config.get("upload", {})
+    opt = QApplication.instance().config.upload
     e = self.index.get(p)
     for doc in files:
       log.info("Uploading %s to %s", doc, e.visibleName if e else "root")
