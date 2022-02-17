@@ -55,24 +55,14 @@ class RemyApp(QApplication):
     log.debug("Cache at '%s'", self.paths.cache_dir)
     log.debug("Known hosts at '%s'", self.paths.known_hosts)
 
-    sources = config.get('sources')
-    source = config.selectedSource()
-
-    if len(sources) > 0 and source is None:
-      source = config.get('default_source')
-      if not source:
-        source, ok = self.sourceSelectionBox()
-        if not ok:
-          log.error("Sorry, I need a source to work.")
-          sys.exit()
-      config.selectSource(source)
-
     self.aboutToQuit.connect(self.cleanup)
     self.fsource = None
 
   @pyqtSlot()
   def cleanup(self):
+    log.info("Waiting for stray threads")
     QThreadPool.globalInstance().waitForDone()
+    log.info("Done waiting")
     if self.fsource:
       self.fsource.cleanup()
       self.fsource.close()
@@ -111,6 +101,39 @@ class RemyApp(QApplication):
   def requestInit(self, **overrides):
     self.fsource = None
     self.setQuitOnLastWindowClosed(False)
+
+    sources = self.config.get('sources')
+    source = self.config.selectedSource()
+
+    if len(sources) == 0:
+      mbox = QMessageBox(
+        QMessageBox.Warning,
+        "Configuration error",
+        "No sources defined in current configuration."
+      )
+      mbox.setInformativeText(
+        "<big>Please locate or create the file"
+        "<p><code>%s</code></p>"
+        "and add configurations to it according"
+        "to the <a href='https://github.com/bordaigorl/remy/#configuration'>documentation</a>.</big>"
+        % self._paths.config
+      )
+      confBtn = mbox.addButton("Open Config…", QMessageBox.HelpRole)
+      mbox.addButton(QMessageBox.Close)
+      mbox.exec()
+      if mbox.clickedButton() == confBtn:
+        self.openSettings(prompt=False)
+      return False
+
+    if source is None:
+      source = self.config.get('default_source')
+      if not source:
+        source, ok = self.sourceSelectionBox()
+        if not ok:
+          log.error("Sorry, I need a source to work.")
+          return False
+      self.config.selectSource(source)
+
     self.initDialog = RemyProgressDialog(label="Loading: ")
     init = RemyInitWorker(*self.config.connectionArgs(**overrides))
     self.initDialog.canceled.connect(init.signals.cancelInit)
@@ -119,6 +142,7 @@ class RemyApp(QApplication):
     init.signals.canceled.connect(self.canceledInit)
     init.signals.progress.connect(self.initDialog.onProgress)
     QThreadPool.globalInstance().start(init)
+    return True
 
 
   @pyqtSlot(Exception)
@@ -218,9 +242,10 @@ class RemyApp(QApplication):
   @pyqtSlot()
   def openSettings(self, prompt=True):
     if self.paths.config is None:
-      QMessageBox.critical("Configuration", "No configuration found")
+      QMessageBox.critical("Configuration", "No configuration path found")
       self.quit()
       return
+    log.info("Configuration at '%s'", self.paths.config)
     if prompt:
       ans = QMessageBox.information(
               None,
@@ -233,7 +258,7 @@ class RemyApp(QApplication):
         return
 
     confpath = self.paths.config
-    if confpath.is_file():
+    if not confpath.is_file():
       confpath = confpath.resolve()
       confpath.parent.mkdir(exist_ok=True)
       with open(confpath, "w") as f:
@@ -361,12 +386,14 @@ def main():
     log.fatal("Misconfiguration: %s", str(e))
     sys.exit(1)
 
-  app.requestInit()
+  if app.requestInit():
+    signal.signal(signal.SIGINT, lambda *args: app.quit())
+    ecode = app.exec_()
+    log.info("QUITTING: %s", time.asctime())
+    sys.exit(ecode)
+  else:
+    log.info("Could not start the app, quitting.")
 
-  signal.signal(signal.SIGINT, lambda *args: app.quit())
-  ecode = app.exec_()
-  log.info("QUITTING: %s", time.asctime())
-  sys.exit(ecode)
 
 # THE APP IS EXITING BECAUSE IT NEEDS OPEN DIALOGS TO STAY ALIVE
 # Either handle autoclosing manually
