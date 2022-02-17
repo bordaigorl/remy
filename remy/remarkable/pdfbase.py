@@ -74,5 +74,5 @@ class PDFBase():
           if w <= h:
             return page.renderToImage(xres, yres)
           else:
-            return page.renderToImage(xres, yres, -1,-1,-1,-1, pdf.Rotate270)
+            return page.renderToImage(xres, yres, -1,-1,-1,-1, page.Rotate270)
     return QImage()
