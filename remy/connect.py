@@ -106,6 +106,7 @@ def connect(address='10.11.99.1', username='root', password=None, key=None, time
     'password': password,
     'pkey':     pkey,
     'timeout':  timeout,
+    'disabled_algorithms': dict(pubkeys=["rsa-sha2-512", "rsa-sha2-256"]),
   }
 
   try:
