@@ -149,8 +149,8 @@ class NotebookView(QGraphicsView):
     # self.refreshTitle()
     self.pageChanged.emit(old_page+1, self._page+1)
 
-  def makePageScene(self, i, **options):
-    if i in self._page_cache:
+  def makePageScene(self, i, replace=False, **options):
+    if not replace and i in self._page_cache:
       return self._page_cache[i]
 
     scene = self._page_cache[i] = QGraphicsScene()
@@ -369,17 +369,18 @@ class NotebookView(QGraphicsView):
       self._smoothen = not self._smoothen
       i = self._page
       self._tolerance.setdefault(i, 0)
-      self._page_cache[i] = self.makePageScene(i, simplify=self._tolerance[i], smoothen=self._smoothen)
+      self.makePageScene(i, replace=True, simplify=self._tolerance[i], smoothen=self._smoothen)
       self.setScene(self._page_cache[i])
     elif event.key() == Qt.Key_S:
       i = self._page
       self._tolerance.setdefault(i, .5)
       if event.modifiers() & Qt.ShiftModifier:
         if self._tolerance[i] > 0:
-          self._tolerance[i] -= .5
+          self._tolerance[i] -= .25
       else:
-        self._tolerance[i] += .5
-      self._page_cache[i] = self.makePageScene(i, simplify=self._tolerance[i], smoothen=self._smoothen)
+        self._tolerance[i] += .25
+      log.info("Tolerance: %g", self._tolerance[i])
+      self.makePageScene(i, replace=True, simplify=self._tolerance[i], smoothen=self._smoothen)
       self.setScene(self._page_cache[i])
 
 
