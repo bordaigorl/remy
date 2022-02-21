@@ -16,8 +16,7 @@ from copy import deepcopy
 
 from threading import RLock
 
-import logging
-log = logging.getLogger('remy')
+from remy.utils import log
 
 # DocIndex = namedtuple('DocIndex', 'metadata tree trash')
 FolderNode = namedtuple('FolderNode', 'folders files')

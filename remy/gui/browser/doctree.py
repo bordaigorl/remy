@@ -7,8 +7,7 @@ from remy.gui.qmetadata import *
 # import remy.gui.resources
 # from remy.gui.notebookview import *
 
-import logging
-log = logging.getLogger('remy')
+from remy.utils import log
 
 # from remy.gui.export import webUIExport, exportDocument
 # from remy.gui.browser.info import InfoPanel

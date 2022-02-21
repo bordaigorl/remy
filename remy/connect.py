@@ -10,8 +10,8 @@ from binascii import hexlify
 
 import sys
 import os
-import logging
-log = logging.getLogger('remy')
+
+from remy.utils import log
 
 import socket
 

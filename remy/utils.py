@@ -1,3 +1,9 @@
+import logging
+
+logging.basicConfig(format='[%(levelname).1s] %(message)s')
+
+log = logging.getLogger('remy')
+
 
 def deepupdate(d, u):
   stack = [(d,u)]

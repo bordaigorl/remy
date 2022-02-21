@@ -21,8 +21,7 @@ from remy.gui.browser import *
 from remy.connect import connect, BadHostKeyException, UnknownHostKeyException
 
 import time
-import logging
-logging.basicConfig(format='[%(levelname).1s] %(message)s')
+from remy.utils import log, logging
 
 def _mkIcon(fn):
   icon = QPixmap(fn)
@@ -37,7 +36,6 @@ class RemyApp(QApplication):
 
   def __init__(self, args):
     QApplication.__init__(self, args)
-    log = logging.getLogger('remy')
     self.setQuitOnLastWindowClosed(False)
 
     self.setOrganizationDomain('emanueledosualdo.com')

@@ -8,8 +8,7 @@ from PyQt5.QtPrintSupport import *
 from remy.remarkable.constants import COLORS
 from remy.remarkable.palette import Palette
 
-import logging
-log = logging.getLogger('remy')
+from remy.utils import log
 
 PALETTE_ORDER = [
   ["black", "gray", "white"],

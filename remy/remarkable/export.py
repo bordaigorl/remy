@@ -13,8 +13,7 @@ from PyPDF2.generic import NullObject
 from remy.remarkable.metadata import PDFBasedDoc
 from remy.remarkable.render import BarePageScene, Palette
 
-import logging
-log = logging.getLogger('remy')
+from remy.utils import log
 
 
 

@@ -14,8 +14,7 @@ from remy.gui.export import webUIExport, exportDocument
 # from os import path
 
 # import time
-import logging
-log = logging.getLogger('remy')
+from remy.utils import log
 
 
 

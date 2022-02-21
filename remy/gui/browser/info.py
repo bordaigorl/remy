@@ -6,8 +6,7 @@ from remy.gui.qmetadata import *
 from remy.gui.thumbnail import ThumbnailWorker
 import remy.gui.resources
 
-import logging
-log = logging.getLogger('remy')
+from remy.utils import log
 
 THUMB_HEIGHT = 150
 

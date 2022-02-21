@@ -4,8 +4,7 @@ from PyQt5.QtCore import *
 
 from remy.hwr.mathpix import mathpixRaster, MathPixError
 
-import logging
-log = logging.getLogger('remy')
+from remy.utils import log
 
 
 class HWRSignal(QObject):

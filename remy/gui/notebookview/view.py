@@ -12,8 +12,7 @@ from remy.gui.export import exportDocument
 
 from os import path
 
-import logging
-log = logging.getLogger('remy')
+from remy.utils import log
 
 
 class Actions:

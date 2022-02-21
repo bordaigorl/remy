@@ -9,8 +9,7 @@ from shutil import which
 
 from threading import RLock
 
-import logging
-log = logging.getLogger('remy')
+from remy.utils import log
 
 
 

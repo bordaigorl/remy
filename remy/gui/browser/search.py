@@ -2,8 +2,7 @@ from PyQt5.QtGui import *
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 
-import logging
-log = logging.getLogger('remy')
+from remy.utils import log
 
 from remy.gui.browser.delegates import PinnedDelegate
 

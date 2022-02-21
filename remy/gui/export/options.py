@@ -12,8 +12,7 @@ from remy.gui.export.palette import PaletteSelector
 from os import path
 import time
 
-import logging
-log = logging.getLogger('remy')
+from remy.utils import log
 
 
 class ExportDialog(QDialog):

@@ -1,8 +1,7 @@
 from remy.remarkable.constants import *
 from threading import RLock
 
-import logging
-log = logging.getLogger('remy')
+from remy.utils import log
 
 
 class PDFBase():

@@ -1,8 +1,7 @@
 import traceback
 from PyQt5.QtCore import *
 
-import logging
-log = logging.getLogger('remy')
+from remy.utils import log
 
 
 class NewEntryCancelled(Exception):

@@ -7,8 +7,7 @@ from PyQt5.QtCore import *
 import remy.remarkable.constants as rm
 from remy.remarkable.render import BarePageScene, IGNORE_ERASER
 
-import logging
-log = logging.getLogger('remy')
+from remy.utils import log
 
 class ThumbnailSignal(QObject):
   thumbReady = pyqtSignal(str, QImage)

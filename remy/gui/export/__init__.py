@@ -10,8 +10,7 @@ from remy.gui.export.options import ExportDialog
 
 from os import path
 
-import logging
-log = logging.getLogger('remy')
+from remy.utils import log
 
 
 class ExportOperation(QObject):

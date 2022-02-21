@@ -5,8 +5,7 @@ import argparse
 
 from collections import namedtuple
 
-import logging
-log = logging.getLogger('remy')
+from remy.utils import log, logging
 
 
 from remy.utils import deepupdate

@@ -10,8 +10,7 @@ from PyQt5.QtCore import *
 from remy.remarkable.constants import *
 from remy.remarkable.render import BarePageScene, IGNORE_ERASER
 
-import logging
-log = logging.getLogger('remy')
+from remy.utils import log
 
 
 try:

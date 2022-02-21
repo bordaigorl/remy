@@ -11,8 +11,7 @@ from remy.remarkable.palette import *
 from itertools import groupby
 
 import time
-import logging
-log = logging.getLogger('remy')
+from remy.utils import log
 
 
 QUICK_ERASER    = 0
