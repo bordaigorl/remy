@@ -50,11 +50,13 @@ class ColorButton(QWidget):
 
   def paintEvent(self, event):
     painter = QPainter(self)
-    painter.setPen(QColor(100,100,100))
-    painter.setBrush(QColor(self._color))
-    # painter.setRenderHint(QPainter.Antialiasing)
+    painter.setRenderHint(QPainter.Antialiasing)
     p = self.contentsRect()
-    painter.drawRect(QRect(QPoint(p.left(), p.center().y()-8),QSize(16,16)))
+    painter.setPen(QColor(120,120,120))
+    painter.setBrush(QColor(self._color))
+    # painter.drawRect(QRect(QPoint(p.left(), p.center().y()-8),QSize(16,16)))
+    painter.drawChord(QRect(QPoint(p.left()+1, p.center().y()-7),QSize(14,14)), 0, 5760)
+    # painter.drawRoundedRect(QRect(QPoint(p.left()+1, p.center().y()-7),QSize(14,14)),3,3)
 
   def setEditable(self, editable):
     self._editable = editable
