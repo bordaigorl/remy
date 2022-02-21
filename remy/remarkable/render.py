@@ -329,7 +329,7 @@ class PageGraphicsItem(QGraphicsRectItem):
           group.setParentItem(newgroup)
           group = newgroup
         else:
-          if (simplify > 0 or smoothen) and tool == rm.FINELINER_TOOL:
+          if (simplify > 0 or smoothen) and (tool == rm.FINELINER_TOOL or tool == rm.BALLPOINT_TOOL):
             pen.setWidthF(k.width)
             if simplify > 0:
               sk = simpl(k, simplify)
