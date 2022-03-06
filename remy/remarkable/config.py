@@ -37,7 +37,7 @@ OPTIONS_DEFAULTS = {
     "eraser_mode": "ignore",
     "pencil_resolution": 0.4
   },
-  "import": {
+  "upload": {
     "default_options": {}
   },
   "palettes": {
