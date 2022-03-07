@@ -2,6 +2,7 @@ import json
 from copy import deepcopy
 
 import argparse
+from pathlib import Path
 
 from collections import namedtuple
 
@@ -172,9 +173,14 @@ class RemyConfig():
   def mathpix(self):
     return self.renderOptionsFrom('mathpix')
 
-  @property
-  def upload(self):
-    return self.renderOptionsFrom('upload')
+  def upload(self, path=''):
+    upload = self.get('upload')
+    opt = deepcopy(upload.get('default_options'))
+    if path+'_options' not in upload:
+      path = Path(path).suffix.lstrip('.').lower()
+    if path:
+      deepupdate(opt, upload.get(path+'_options', {}))
+    return opt
 
   @property
   def preview(self):

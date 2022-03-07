@@ -75,6 +75,7 @@ Create a JSON file at that path with the following structure:
   "palettes" : {...},
   "preview": {...},
   "export": {...},
+  "upload": {...},
   "mathpix" : {...}
 }
 ```
@@ -282,6 +283,65 @@ In addition to `RENDER_OPTIONS` you can also set the `default_dir` and the `open
 
 The highlighter colors will be rendered with opacity 50%
 since the PDF exporter of Qt5 does not support blend modes.
+
+### Upload options
+
+The upload section determines the defaults used for documents uploaded via Remy.
+This section can contain three sub-sections, all optional:
+
+```json
+"export": {
+  "default_options": UPLOAD_OPTIONS,
+  "pdf_options": UPLOAD_OPTIONS,
+  "epub_options": UPLOAD_OPTIONS
+}
+```
+
+Here, `UPLOAD_OPTIONS` is a dictionary which would overwrite the default values stored in the `.contents` metadata files on the tablet.
+This includes information about the initial tool settings like selected tool, width for each tool, color for each tool etc.
+The available options are whichever ones are supported by the tablet. They are undocumented and so this setting is done through guesswork; making mistakes should not be harmful however.
+
+The options in `pdf_options` and `epub_options` inherit the ones in `default_options`.
+Here is an example:
+
+```json
+"default_options": {
+    "extraMetadata": {
+        "LastBallpointv2Color": "Black",
+        "LastBallpointv2Size": "2",
+        "LastCalligraphyColor": "Black",
+        "LastCalligraphySize": "3",
+        "LastEraserSize": "1",
+        "LastEraserTool": "Eraser",
+        "LastFinelinerv2Color": "Black",
+        "LastFinelinerv2Size": "1",
+        "LastHighlighterv2Color": "HighlighterYellow",
+        "LastMarkerv2Color": "White",
+        "LastMarkerv2Size": "3",
+        "LastPaintbrushv2Color": "Black",
+        "LastPaintbrushv2Size": "3",
+        "LastPencilv2Color": "Black",
+        "LastPencilv2Size": "2",
+        "LastSharpPencilv2Color": "Black",
+        "LastSharpPencilv2Size": "2",
+        "LastPen": "Ballpointv2",
+        "LastTool": "Ballpointv2"
+    }
+},
+"pdf_options": {
+    "extraMetadata": {
+        "LastFinelinerSize": "1",
+        "LastPen": "Finelinerv2",
+        "LastTool": "Finelinerv2"
+    }
+},
+"epub_options": {
+    "extraMetadata": {
+        "LastPen": "Highlighterv2",
+        "LastTool": "Highlighterv2"
+    }
+}
+```
 
 
 ### Mathpix options
