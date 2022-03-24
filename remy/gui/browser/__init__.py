@@ -315,8 +315,8 @@ class FileBrowser(QMainWindow):
   def selectView(self, which):
     which.setChecked(True)
     if which is self.actions.browse:
+      self.lastView = which
       if self.currentView() is not self.tree:
-        self.lastView = which
         self.results.setQuery(None)
         self.results.showDeleted(False)
         self.results.showPinnedOnly(False)
