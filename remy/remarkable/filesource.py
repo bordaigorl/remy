@@ -178,7 +178,7 @@ class LiveFileSourceSSH(FileSource):
 
   _dirty = False
 
-  def __init__(self, ssh, name="SSH", cache_dir=None, username=None, remote_documents=None, remote_templates=None, use_banner=False, connect=True, utils_path='$HOME', **kw):
+  def __init__(self, ssh, cache_dir, name="SSH", username=None, remote_documents=None, remote_templates=None, use_banner=False, connect=True, utils_path='$HOME', **kw):
     self.ssh = ssh
     self.name = name
 
