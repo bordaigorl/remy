@@ -79,6 +79,9 @@ class NotebookViewer(QMainWindow):
     tb.setMovable(False)
     self.addToolBar(tb)
 
+    if not document.canRenderBase():
+      self.statusBar().showMessage('The PDF document will not show in the preview, but will show in the exported PDF')
+
     self.view.pageChanged.connect(self._onPageChange)
     self._onPageChange(self.view.currentPageNum(), self.view.currentPageNum())
 

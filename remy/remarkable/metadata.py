@@ -282,6 +282,10 @@ class Document(Entry):
   def baseDocumentName(self):
     return None
 
+  def canRenderBase(self):
+    base = self.baseDocument()
+    return (base is None) or base.canRender()
+
 
 Page = namedtuple('Page', ['layers', 'version', 'pageNum', 'document', 'background'],
                                     defaults = [ None,      None,       None ])
