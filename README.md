@@ -25,7 +25,13 @@ For a basic backup of the tablet's data:
 
 ## Installation
 
-The installation process is a bit less straightforward than ideal because `python-poppler-qt5` has [broken installation scripts](https://github.com/frescobaldi/python-poppler-qt5/pull/45).
+An installation script and pre-built bundles are in the roadmap but not available yet.
+
+The following installs the dependencies on MacOs (Catalina), assuming `python` version 3.8 (if not, use `pyenv` to install and manage Python versions):
+
+```bash
+pip install requests arrow paramiko PyPDF2 PyQt5 PyMuPDF simplification sip
+```
 
 The requirements are:
 
@@ -35,22 +41,14 @@ The requirements are:
 - paramiko
 - PyPDF2
 - PyQt5
-- python-poppler-qt5 (see below)
+
+Only required for previewing PDF files:
+
+- PyMuPDF (or, alternatively, python-poppler-qt5)
 
 Optional:
 
-- simplification (this requires python < 3.9, but I plan to make this dependency optional)
-
-The following works on MacOs (Catalina), assuming `python` version 3.8 (if not, use `pyenv` to install and manage Python versions):
-
-```bash
-# Build dependencies
-brew install cmake poppler-qt5
-# Install regular dependencies
-pip install requests arrow paramiko PyPDF2 PyQt5 simplification sip
-# Install python-poppler-qt5 using SIP5
-pip install git+git://github.com/frescobaldi/python-poppler-qt5@92e5962ec3751ab051d0b655fd61afc7a1cf709e
-```
+- simplification (this requires python < 3.9)
 
 
 ## Usage
