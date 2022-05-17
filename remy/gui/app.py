@@ -396,3 +396,7 @@ def main():
 # THE APP IS EXITING BECAUSE IT NEEDS OPEN DIALOGS TO STAY ALIVE
 # Either handle autoclosing manually
 # or keep some dialog always open...
+
+if __name__ == '__main__':
+  main()
+  

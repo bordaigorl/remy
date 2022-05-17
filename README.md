@@ -25,15 +25,32 @@ For a basic backup of the tablet's data:
 
 ## Installation
 
-An installation script and pre-built bundles are in the roadmap but not available yet.
+Pre-built bundles are in the roadmap but not available yet.
+The easiest way to install Remy is via `pip` (from the root of this repo):
 
-The following installs the dependencies on MacOs (Catalina), assuming `python` version 3.8 (if not, use `pyenv` to install and manage Python versions):
+    pip install --user ".[default]"
 
-```bash
-pip install requests arrow paramiko PyPDF2 PyQt5 PyMuPDF simplification sip
-```
+There are few variants which might be suitable for different environments:
 
-The requirements are:
+    # To install Remy without PDF preview support:
+    pip install --user .
+    # To install Remy with PDF preview support via `PyMuPDF` (equivalent to default):
+    pip install --user ".[mupdf]"
+    # To install Remy with PDF preview support via `python-poppler-qt5`:
+    pip install --user ".[poppler]"
+    # To install Remy with support for lines simplification:
+    pip install --user ".[simpl]"
+
+Combinations are also possible, for example `pip install --user ".[mupdf,simpl]"`.
+
+After installation the tool can be launched by running `remy` from a console (or `python -m remy.gui`).
+
+
+### Manual installation
+
+Remy's installation has been tested on MacOs Monterey, `python` version 3.8.
+
+The mandatory dependencies are:
 
 - requests
 - sip
@@ -50,17 +67,21 @@ Optional:
 
 - simplification (this requires python < 3.9)
 
+The entry point is `remy.gui`:
+
+    python -m remy.gui
 
 ## Usage
 
 The main intended usage is as a GUI for connecting to the tablet.
 The app however also supports reading from a local backup.
-The main entry point for the app is `remygui.py`.
+The main entry point for the app is `remy.gui`.
 
 ## Configuration
 
-Starting it the fist time with `python remygui.py` will print an error message with the path where the app is expecting to find a configuration file (on macOS it would be something like `/Users/<user>/Library/Preferences/remy.json`).
-Create a JSON file at that path with the following structure:
+Starting it the fist time with `python -m remy.gui` will show an error message with the path where the app is expecting to find a configuration file (on macOS it would be something like `/Users/<user>/Library/Preferences/remy.json`).
+The message box will offer to open the file and populate it with some basic defaults. These should be enough to test basic functionality but much more can be obtained by properly configuring Remy.
+The configuration file is a JSON file with the following structure:
 
 ```json
 {
@@ -362,7 +383,7 @@ Only one page at a time can be exported (via context menu in preview) and the da
 
 Once the configuration file contains the necessary info, you can run Remy by running
 
-    python remygui.py [SOURCE]
+    remy [SOURCE]
 
 The option is the id of one of the sources defined in the configuration file.
 With no option, the default source will be selected.
