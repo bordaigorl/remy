@@ -177,6 +177,8 @@ class PageGraphicsItem(QGraphicsRectItem):
       # colors=None,
       # highlight=DEFAULT_HIGHLIGHT,
       pencil_resolution=.4,
+      thickness_scale=1,
+      # thickness_scale_artistic=False,
       simplify=0,
       smoothen=False,
       eraser_mode=AUTO_ERASER,
@@ -329,7 +331,7 @@ class PageGraphicsItem(QGraphicsRectItem):
           group = newgroup
         else:
           if (simplify > 0 or smoothen) and (tool == rm.FINELINER_TOOL or tool == rm.BALLPOINT_TOOL):
-            pen.setWidthF(k.width)
+            pen.setWidthF(thickness_scale*k.width)
             if simplify > 0:
               sk = simpl(k, simplify)
             else:
@@ -359,10 +361,10 @@ class PageGraphicsItem(QGraphicsRectItem):
                 # draw fuzzy edges
                 item=QGraphicsPathItem(path, group)
                 pen.setBrush(pencilBrushes().getBrush(int(p*.7), scale=pencil_resolution))
-                pen.setWidthF(w*1.15)
+                pen.setWidthF(thickness_scale*w*1.15)
                 item.setPen(pen)
 
-              pen.setWidthF(w)
+              pen.setWidthF(thickness_scale*w)
               if p is not None:
                 if pencil_resolution > 0:
                   pen.setBrush(pencilBrushes().getBrush(p, scale=pencil_resolution))

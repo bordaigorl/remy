@@ -111,6 +111,16 @@ class ExportDialog(QDialog):
     emode.addItem("Quick & Dirty", "quick")
     form.addRow("Eraser mode:", emode)
 
+    # Stroke width scaling
+    # thickn = QHBoxLayout()
+    thickness = self.thickness = QDoubleSpinBox()
+    thickness.setMinimum(0)
+    thickness.setSingleStep(0.05)
+    # thickArtistic = self.thickArtistic = QCheckBox("Artistic brushes")
+    # thickn.addWidget(thickness)
+    # thickn.addWidget(thickArtistic)
+    form.addRow("Thickness:", thickness)
+
     # Simplification TOLERANCE & smoothening
     simplsm = QHBoxLayout()
     tolerance = self.tolerance = QDoubleSpinBox()
@@ -184,6 +194,9 @@ class ExportDialog(QDialog):
 
     self.includeBase.setChecked(self.options.get("include_base_layer", True))
 
+    self.thickness.setValue(self.options.get("thickness_scale", 1))
+    # self.thickArtistic.setChecked(self.options.get("thickness_scale_artistic", False))
+
     self.smoothen.setChecked(self.options.get("smoothen", False))
     self.tolerance.setValue(self.options.get("simplify", 0))
     # colors = self.options.get("colors", {})
@@ -202,11 +215,13 @@ class ExportDialog(QDialog):
       self.pathsel.text(),
       self.pageRanges.text(),
       {
-        'simplify': self.tolerance.value(),
         'eraser_mode': self.eraserMode.currentData(),
         'orientation': self.orientation.currentData(),
         'open_exported': self.openExp.isChecked(),
         'include_base_layer': self.includeBase.isChecked(),
+        'thickness_scale': self.thickness.value(),
+        # 'thickness_scale_artistic': self.thickArtistic.isChecked(),
+        'simplify': self.tolerance.value(),
         'smoothen': self.smoothen.isChecked(),
         'palette': self.colorsel.getPalette(),
         'exclude_layers': parseExcludeLayers(self.exclLayers.text()),
