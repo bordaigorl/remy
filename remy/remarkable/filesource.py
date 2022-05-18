@@ -178,15 +178,19 @@ class LiveFileSourceSSH(FileSource):
 
   _dirty = False
 
-  def __init__(self, ssh, name="SSH", cache_dir=None, username=None, remote_documents=None, remote_templates=None, use_banner=False, connect=True, utils_path='$HOME', **kw):
+  def __init__(self, ssh, id='_default', name="SSH", cache_dir=None, username=None, remote_documents=None, remote_templates=None, use_banner=False, connect=True, utils_path='$HOME', persist_cache=True, **kw):
     self.ssh = ssh
     self.name = name
+    self.persist_cache = persist_cache
 
-    self.cache_dir = cache_dir = path.expanduser(cache_dir)
+    self.cache_dir = cache_dir = path.join(path.expanduser(cache_dir), id)
     self.local_roots = (
       path.join(cache_dir, 'documents'),
       path.join(cache_dir, 'templates')
     )
+    if not persist_cache and path.isdir(cache_dir):
+      log.debug("Clearing cache")
+      shutil.rmtree(cache_dir, ignore_errors=True)
     self._makeLocalPaths()
 
     _,out,_ = self.ssh.exec_command("echo $HOME")
@@ -197,9 +201,9 @@ class LiveFileSourceSSH(FileSource):
       self.remote_roots[1] = remote_templates
 
     if use_banner:
+      self._dirty = True # force restart of xochitl even when stopping failed
       _,out,_ = ssh.exec_command("/bin/systemctl stop xochitl")
       if out.channel.recv_exit_status() == 0:
-        self._dirty = True
         _,out,_ = ssh.exec_command(utils_path + "/remarkable-splash '%s'" % use_banner)
         out.channel.recv_exit_status()
       else:
@@ -255,7 +259,7 @@ class LiveFileSourceSSH(FileSource):
   def isReadOnly(self):
     return False
 
-  def retrieve(self, *filename, ext=None, progress=None, force=True):
+  def retrieve(self, *filename, ext=None, progress=None, force=False):
     if ext:
       filename = filename[:-1] + (filename[-1] + '.' + ext,)
     cachep = self._local(*filename)
@@ -263,9 +267,21 @@ class LiveFileSourceSSH(FileSource):
       d = path.dirname(cachep)
       if not path.isdir(d):
         os.makedirs(d)
-      if force or not path.isfile(cachep):
-        remp = self._remote(*filename)
+      remp = self._remote(*filename)
+      rstat = self.sftp.stat(remp)
+      found = path.isfile(cachep)
+      if found:
+        lstat = os.stat(cachep)
+        force = (
+          (lstat.st_mtime != rstat.st_mtime) or
+          (lstat.st_size != rstat.st_size)
+        )
+        # not fool-proof but good enough?
+        # There is always the option of setting persist_cache: false
+        # for the source
+      if force or not found:
         self.scp.get(remp, cachep)
+        os.utime(cachep, (rstat.st_atime, rstat.st_mtime))
     return cachep
 
   def retrieveTemplate(self, name, progress=None, force=False, preferVector=False):
@@ -304,7 +320,9 @@ class LiveFileSourceSSH(FileSource):
       return self._isfile(self._remote(*filename))
 
   def cleanup(self):
-    shutil.rmtree(self.cache_dir, ignore_errors=True)
+    if not self.persist_cache:
+      log.debug("Clearing cache")
+      shutil.rmtree(self.cache_dir, ignore_errors=True)
     if self._dirty:
       _,out,_ = self.ssh.exec_command("/bin/systemctl restart xochitl")
       if out.channel.recv_exit_status() == 0:

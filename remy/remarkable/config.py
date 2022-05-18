@@ -194,6 +194,9 @@ class RemyConfig():
 
   def connectionArgs(self, **overrides):
     c = deepcopy(self._source_config)
+    src = self.selectedSource()
+    if src:
+      c['id'] = src
     c.update(overrides)
     t = c.pop('type')
     return (t, c)

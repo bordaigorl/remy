@@ -136,7 +136,8 @@ Obviously, this source is read-only: you cannot upload PDFs to it.
   "key": "~/.ssh/id_rsa_remarkable",
   "username": "root",
   "timeout": 3,
-  "use_banner": "remy-banner.png",
+  "persist_cache": true,
+  "use_banner": "remy-banner.png"
 }
 ```
 
@@ -150,6 +151,11 @@ The option "host" falls back to the USB configuration "10.11.99.1".
 The `use_banner` setting is optional and described below.
 It is possible to specify `remote_documents` and `remote_templates`, these paths need to be absolute ("~" expansion does not work).
 
+It is possible to configure where the cache of the data from the tablet is stored, by setting `cache_dir`.
+The cache is kept across runs, and files are re-downloaded if modified date or size have changed.
+This might leave behind some files and might miss some updates.
+By setting `persist_cache` to `true` the cache is cleared every time.
+
 #### Rsync source
 
 ```json
@@ -162,6 +168,7 @@ It is possible to specify `remote_documents` and `remote_templates`, these paths
   "username": "root",
   "timeout": 3,
   "use_banner": "remy-banner.png",
+  "cache_mode": "on_demand",
   "rsync_path": "/path/to/local/rsync",
   "rsync_options": [ "--rsync-path=/opt/bin/rsync" ]
 }
@@ -174,6 +181,16 @@ Every time you connect, only the changes are downloaded.
 The data-heavy files (PDFs and .rm) are downloaded on demand.
 The optional settings `rsync_path` provides the path to the local rsync binary and `rsync_options` provides additional options, the example above configures the options to find the rsync binary on the remarkable installed using entware.
 
+The `cache_mode` option can take three values:
+
+- `on_demand`: only metadata is synced, other files are downloaded as needed.
+- `full_mirror`: the full contents of the tablet are synced.
+- `light_mirror`: everything is synced except for thumbnails.
+
+The mirror options can be used in combination with a local source:
+it is possible to have two sources, one local (`A`) and one RSync (`B`),
+with `A`'s `documents` setting pointing at the `documents` directory inside of `data_dir` of `B` (and same for `templates`).
+This way every time one connects to `B` a full backup is stored, and the same backup can be accessed offline through `A`.
 
 #### The `use_banner` option
 
