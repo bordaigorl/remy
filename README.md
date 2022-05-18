@@ -264,7 +264,9 @@ The `RENDER_OPTIONS` settings can set the following keys:
     the layers below the strokes would be covered by the eraser which is undesirable.
   * `"auto"` will use `"ignore"` and automatically switch to `"accurate"` when the page contains strokes that may need the accurate method to be rendered precisely (e.g. with very wide strokes).
   
-  
+- `thickness_scale`
+  controls the ratio of the thickness of lines that should actually be rendered (1 is full scale).
+
 - `exclude_layers`
   can be set to a list of numbers between 1 and 5 indicating which layers to exclude from the rendering.
 
@@ -409,6 +411,7 @@ Features:
 - pencil textures
 - control over layers to be rendered, colors to be used
 - page ranges for export
+- thickness scale
 - optional simplification and smoothening (experimental)
 
 Planned features include:
