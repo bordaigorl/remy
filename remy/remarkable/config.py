@@ -207,6 +207,10 @@ class RemyConfig():
       s["use_banner"] = False
       log.warning("The `use_banner` setting is incompatible with `enable_webui_export`: the latter is overriding the former.")
 
-  def dump(self, f):
-    json.dump(self._config, f, indent=4)
+  def dump(self, f, with_defaults=True):
+    conf = self._config
+    if with_defaults and len(conf["sources"]) == 0:
+      conf = deepcopy(conf)
+      conf["sources"] = {"default": SOURCE_DEFAULTS}
+    json.dump(conf, f, indent=4)
 
