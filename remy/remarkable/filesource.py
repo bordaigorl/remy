@@ -169,16 +169,16 @@ TEMPLDIR = 1
 
 class LiveFileSourceSSH(FileSource):
 
-  remote_roots = [
+  remote_roots = (
     '/home/root/.local/share/remarkable/xochitl',
     '/usr/share/remarkable/templates'
-  ]
+  )
 
   _allUids = None
 
   _dirty = False
 
-  def __init__(self, ssh, id='_default', name="SSH", cache_dir=None, username=None, remote_documents=None, remote_templates=None, use_banner=False, connect=True, utils_path='$HOME', persist_cache=True, **kw):
+  def __init__(self, ssh, id='', name="SSH", cache_dir=None, username=None, remote_documents=None, remote_templates=None, use_banner=False, connect=True, utils_path='$HOME', persist_cache=True, **kw):
     self.ssh = ssh
     self.name = name
     self.persist_cache = persist_cache
