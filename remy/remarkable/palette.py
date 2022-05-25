@@ -59,7 +59,7 @@ class Palette():
 
   def opacityBased(self):
     p = Palette(self._palette)
-    for c in ['highlight', 'yellow', 'green', 'pink']:
+    for c in HIGHLIGHTER_CODES.values():
       p._palette[c].setAlpha(127)
     return p
 

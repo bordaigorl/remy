@@ -264,7 +264,8 @@ class PageGraphicsItem(QGraphicsRectItem):
           if color is None:
             log.error("Tool %s Color %s not defined", rm.TOOL_NAME.get(tool, tool), k.color)
             pen.setColor(Qt.red)
-          pen.setColor(color)
+          else:
+            pen.setColor(color)
 
         # WIDTH CALCULATION
         if tool == rm.PENCIL_TOOL:

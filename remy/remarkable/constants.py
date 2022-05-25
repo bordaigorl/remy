@@ -103,6 +103,7 @@ COLORS = {
       "black": "black",
       "white": "white",
        "gray": "#bbbbbb",
+ "blend_gray": "#40404040", # based on RM pdf export
         "red": "#d90707",
        "blue": "#0062cc",
   "highlight": "#7fffeb93", # old highlighter (#AARRGGBB)
@@ -124,4 +125,5 @@ HIGHLIGHTER_CODES = {
   3: "yellow",
   4: "green",
   5: "pink",
+  8: "blend_gray",
 }

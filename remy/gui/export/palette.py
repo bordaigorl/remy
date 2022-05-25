@@ -13,7 +13,7 @@ from remy.utils import log
 PALETTE_ORDER = [
   ["black", "gray", "white"],
   ["red", "blue"],
-  ["highlight", "yellow", "green", "pink"]
+  ["highlight", "yellow", "green", "pink", "blend_gray"]
 ]
 
 COLOR_TITLES = {
@@ -21,6 +21,7 @@ COLOR_TITLES = {
      "yellow": "Highlighter Yellow",
       "green": "Highlighter Green",
        "pink": "Highlighter Pink",
+ "blend_gray": "Highlighter Gray",
 }
 
 

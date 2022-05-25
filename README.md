@@ -213,6 +213,7 @@ The `palettes` section is a dictionary of color palettes, for example:
     "grayscale": {
         "black": "black",
         "gray": "#bbbbbb",
+        "blend_gray": "#7fbbbbbb",
         "white": "white",
         "blue": "#cccccc",
         "red": "#dddddd",
@@ -234,7 +235,7 @@ The palettes defined in the section are used in two ways:
 - the defined names can be used as values of the `palette` setting in the `preview` and `export` sections.
 
 The color identifiers are `black`, `gray`, `white`, `blue`, and `red`,
-and for the highlighter colors they are `highlight` (for the old opacity-based highlighter) `yellow`, `green`, and `pink`.
+and for the highlighter colors they are `highlight` (for the old opacity-based yellow highlighter) `yellow`, `green`, `pink`, and `blend_gray` for the opacity-based gray introduced in update 2.13.
 
 Currently it is not possible to change the pencil's color.
 
