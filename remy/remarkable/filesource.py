@@ -459,7 +459,7 @@ class LiveFileSourceRsync(LiveFileSourceSSH):
         self.templates[name]['png'] = t["filename"] + '.png'
 
   def _remote_rsync(self, path):
-    return "%s@%s:'%s'" % (self.username, self.host, path)
+    return "%s@%s:%s" % (self.username, self.host, path)
 
   def _bulk_download(self, fr, to, excludes=['*'], includes=[], delete=True, progress=None):
     cmd = self.RSYNC + ['-vaz', '--prune-empty-dirs']
