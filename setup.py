@@ -43,7 +43,7 @@ setup(
   ],
   packages=find_packages(),
   python_requires=">=3.8",
-  install_requires=['pyqt5', 'requests', 'sip', 'arrow', 'paramiko', 'pypdf2'],
+  install_requires=['pyqt5', 'requests', 'sip', 'arrow', 'paramiko', 'PyPDF2<=1.28.4'],
   extras_require={
     'default': ['pymupdf'],
     'simpl': ['simplification'],
