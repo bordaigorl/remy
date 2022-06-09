@@ -104,7 +104,7 @@ def pdfmerge(base, outputPath, pdfRanges=None, rotate=0, progress=None):
         tx = w * ratio
         ty = ah - ( h * ratio )
         rot = 90
-      np.mergeRotatedScaledTranslatedPage(bp, rot, ratio, tx, ty)
+      np.mergeRotatedScaledTranslatedPage(bp, rot, ratio, float(tx), float(ty))
       np.mergePage(ap)
       if rotate:
         np.rotateCounterClockwise(rotate)
