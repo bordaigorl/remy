@@ -123,6 +123,12 @@ class Entry:
       return self.get('lastOpenedPage', 0)
     return c
 
+  def allTags(self, including_pages=True):
+    tags = set(t["name"] for t in self.tags or [])
+    if including_pages:
+      tags |= set(t["name"] for t in self.pageTags or [])
+    return tags
+
   def get(self, field, default=None, where=BOTH):
     if field in self._metadata and where & METADATA:
       return self._metadata[field]
@@ -491,6 +497,7 @@ class RemarkableIndex:
     self.fsource = fsource
     uids = list(fsource.listItems())
     index = {ROOT_ID: RootFolder(self)}
+    tags = {}
 
     # progress(0, len(uids))
 
@@ -503,6 +510,20 @@ class RemarkableIndex:
       except Exception as e:
         log.warning("Could not load metadata of %s: skipping [%s]", uid, e)
         continue
+      for t in content.get("tags", []):
+        if t["name"] not in tags:
+          tags[t["name"]] = {
+            "docs": [],
+            "pages": [],
+          }
+        tags[t["name"]]["docs"].append(uid)
+      for t in content.get("pageTags", []):
+        if t["name"] not in tags:
+          tags[t["name"]] = {
+            "docs": [],
+            "pages": [],
+          }
+        tags[t["name"]]["pages"].append({'doc': uid, 'page': t["pageId"]})
       if metadata["type"] == FOLDER_TYPE:
         index[uid] = Folder(self, uid, metadata, content)
       elif metadata["type"] == DOCUMENT_TYPE:
@@ -534,6 +555,7 @@ class RemarkableIndex:
 
     self.index = index
     self.trash = trash
+    self.tags = tags
 
   def _readJson(self, *remote, ext=None):
     fname = self.fsource.retrieve(*remote, ext=ext)
