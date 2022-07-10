@@ -18,6 +18,7 @@
     <file>assets/16/star-add.svg</file>
     <file>assets/16/star-rem.svg</file>
     <file>assets/16/notebook.svg</file>
+    <file>assets/16/tag.svg</file>
     <file>assets/16/pdf.svg</file>
     <file>assets/16/rename.svg</file>
     <file>assets/16/trash.svg</file>
@@ -61,6 +62,7 @@
     <file>assets/symbolic/ok.svg</file>
     <file>assets/symbolic/clear.svg</file>
     <file>assets/symbolic/options.svg</file>
+    <file>assets/symbolic/tag.svg</file>
     <file>assets/rm.svg</file>
     <file>assets/remy.svg</file>
     <file>assets/dead.svg</file>
