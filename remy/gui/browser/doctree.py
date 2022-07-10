@@ -189,6 +189,7 @@ class DocTreeItem(QTreeWidgetItem):
     icon = self.treeWidget()._icon
     self.setData(0, Qt.UserRole, entry.uid)
     flags = Qt.ItemIsEnabled | Qt.ItemIsSelectable
+    self.setText(5, ",".join(entry.allTags()))
     # commented flag settings should be uncommented once move is implemented
     if isinstance(entry, Document):
       flags |= Qt.ItemNeverHasChildren #| Qt.ItemIsDragEnabled
@@ -252,7 +253,7 @@ class DocTree(QTreeWidget):
     self.setMinimumWidth(400)
     self.setIconSize(QSize(24,24))
     # self.setColumnCount(4)
-    self.setHeaderLabels(["Name", "Updated", "", "Type", ""])
+    self.setHeaderLabels(["Name", "Updated", "", "Type", "", "Tags"])
     self.setUniformRowHeights(False)
     self.header().setStretchLastSection(False)
     self.header().setSectionResizeMode(0, QHeaderView.Stretch)

@@ -276,4 +276,7 @@ class InfoPanel(QWidget):
         tgen.signals.thumbReady.connect(self._onThumb)
         QThreadPool.globalInstance().start(tgen)
 
+      self.details.addRow("Tags", QLabel(",".join(entry.allTags())))
+
+
 InfoPanel.thumbs = {}
