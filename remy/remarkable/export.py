@@ -6,9 +6,13 @@ from PyQt5.QtCore import *
 from PyQt5.QtPrintSupport import *
 
 from PyPDF2 import PdfFileReader, PdfFileWriter
-from PyPDF2.pdf import PageObject
-from PyPDF2.utils import PdfReadError
 from PyPDF2.generic import NullObject
+try:
+  from PyPDF2.pdf import PageObject
+  from PyPDF2.utils import PdfReadError
+except ImportError:
+  from PyPDF2 import PageObject
+  from PyPDF2.errors import PdfReadError
 
 from remy.remarkable.metadata import PDFBasedDoc
 from remy.remarkable.render import BarePageScene, Palette
