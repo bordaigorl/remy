@@ -18,11 +18,11 @@ POPPLER     = 2
 try:
   import fitz
   RENDERER = MUPDF
-except Exception:
+except ImportError:
   try:
     from popplerqt5 import Poppler
     RENDERER = POPPLER
-  except Exception:
+  except ImportError:
     RENDERER = NO_RENDERER
 
 # The direct dependencies on Qt and the renderer are ugly:
