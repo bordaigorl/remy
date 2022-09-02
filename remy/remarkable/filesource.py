@@ -6,7 +6,7 @@ import json
 from stat import S_ISREG, S_ISDIR
 import subprocess
 from shutil import which
-
+from pathlib import PurePosixPath
 from threading import RLock
 
 from remy.utils import log
@@ -254,7 +254,7 @@ class LiveFileSourceSSH(FileSource):
     return path.join(self.local_roots[branch], *paths)
 
   def _remote(self, *paths, branch=DOCSDIR):
-    return path.join(self.remote_roots[branch], *paths)
+    return str(PurePosixPath(self.remote_roots[branch]).joinpath(*paths))
 
   def isReadOnly(self):
     return False
