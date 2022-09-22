@@ -121,6 +121,7 @@ COLOR_CODES = {
 }
 
 HIGHLIGHTER_CODES = {
+  0: "highlight",
   1: "highlight",
   3: "yellow",
   4: "green",
