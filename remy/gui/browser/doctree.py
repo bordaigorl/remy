@@ -333,9 +333,9 @@ class DocTree(QTreeWidget):
   def selectedEntries(self):
     return [i.entry() for i in self.selectedItems()]
 
-  def mouseReleaseEvent(self, event):
+  def mousePressEvent(self, event):
     i = self.indexAt(event.pos())
-    QTreeView.mouseReleaseEvent(self, event)
+    QTreeView.mousePressEvent(self, event)
     if not i.isValid():
       self.setCurrentItem(self.invisibleRootItem())
 

@@ -224,7 +224,7 @@ class FileBrowser(QMainWindow):
     # tree.selectionCleared.connect(self.selClear)
 
     # results.selected.connect(self.resultSelected)
-    results.selected.connect(self.selectionChanged)
+    results.itemSelectionChanged.connect(self.selectionChanged)
     # results.selected.connect(self.treeCurrentChanged)
     results.activated.connect(self.resultActivated)
 
@@ -434,7 +434,7 @@ class FileBrowser(QMainWindow):
   @pyqtSlot()
   def exportSelected(self):
     # for now, later use selectedItems
-    entry = self.tree.currentEntry()
+    entry = self.currentView().currentEntry()
     if entry:
       exportDocument(entry, self)
 

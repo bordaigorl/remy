@@ -5,6 +5,7 @@ from PyQt5.QtCore import *
 from remy.utils import log
 
 from remy.gui.browser.delegates import PinnedDelegate
+from remy.remarkable.metadata import RemarkableError
 
 ### This proxy can be attached to the model of a DocTree to flatten the hierarchy
 # class FlatRemarkableProxyModel(QAbstractProxyModel):
@@ -162,18 +163,17 @@ class FlatRemarkableIndexModel(QAbstractTableModel):
                      [Qt.ToolTipRole, Qt.ForegroundRole, Qt.UserRole + 1,
                       Qt.UserRole + 2, Qt.UserRole + 3, Qt.DisplayRole])
 
-  def entryFromIndex(self, index):
-    if index.isValid():
-      return self._index.get(self._uids[index.row()])
-
   def entryOf(self, uid):
-    return self._index.get(uid)
+    try:
+      return self._index.get(uid)
+    except RemarkableError:
+      return None
 
 
 class SearchResults(QTreeView):
 
   entryTypes = set()
-  selected = pyqtSignal(QModelIndex)
+  itemSelectionChanged = pyqtSignal()
   queryChanged = pyqtSignal(str)
 
   def __init__(self, index, parent=None):
@@ -298,42 +298,36 @@ class SearchResults(QTreeView):
 
   def selectionChanged(self, sel, desel):
     QTreeView.selectionChanged(self, sel, desel)
-    log.debug("SEARCH SEL: %d", len(self.selectedIndexes()))
-    sel = self.selectedIndexes()
-    if len(sel) > 0:
-      self.selected.emit(sel[0])
-    else:
-      self.selected.emit(QModelIndex())
+    self.itemSelectionChanged.emit()
 
   @pyqtSlot()
   def clearSelection(self):
     QTreeView.clearSelection(self)
     self.setCurrentIndex(QModelIndex())
-    self.selected.emit(QModelIndex())
+    self.itemSelectionChanged.emit()
 
-  def mouseReleaseEvent(self, event):
+  def mousePressEvent(self, event):
     i = self.indexAt(event.pos())
-    QTreeView.mouseReleaseEvent(self, event)
     if not i.isValid():
       self.setCurrentIndex(QModelIndex())
+    QTreeView.mousePressEvent(self, event)
 
   # def currentChanged(self, curr, prev):
   #   QTreeView.currentChanged(self, curr, prev)
   #   log.debug("SEARCH CURR: %s -> %s", prev.row(),curr.row())
   #   self.selected.emit(curr)
 
+  def entryFromIndex(self, i):
+    return self._index_model.entryOf(self.model().data(i, Qt.UserRole))
+
   def currentEntry(self):
-    sel = self.selectedIndexes()
-    if len(sel) > 0:
-      i = sel[0]
-      if i.isValid():
-        return self._index_model.entryOf(self.model().data(i, Qt.UserRole))
-    return None
+    i = self.currentIndex()
+    if i.isValid():
+      return self.entryFromIndex(i)
 
   def selectedEntries(self):
-    # just because of the selection mode
-    e = self.currentEntry()
-    return [e] if e else []
+    # selectedIndexes returns an index for each column of each selected row, so you need to filter for the column 0 indexes
+    return [self.entryFromIndex(i) for i in self.selectedIndexes() if i.isValid() and i.column() == 0]
 
   def hasPendingItems(self):
     return False
