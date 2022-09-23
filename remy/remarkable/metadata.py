@@ -107,6 +107,9 @@ class Entry:
   def path(self, delim=None):
     return self.index.pathOf(self.uid, delim=delim)
 
+  def fullPath(self):
+    return self.index.fullPathOf(self.uid)
+
   def updatedOn(self):
     try:
       updated = arrow.get(int(self.lastModified)/1000).humanize()
@@ -366,6 +369,7 @@ class PDFBasedDoc(Document):
     for i, p in enumerate(self.pages):
       if self.fsource.exists(self.uid, p, ext='rm'):
         yield i
+  # TODO: hasMarkedPages and hasHighlights (returning number of)
 
   def retrieveBaseDocument(self):
     b = self.baseDocumentName()
