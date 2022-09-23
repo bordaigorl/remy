@@ -261,6 +261,33 @@ class Document(Entry):
 
     return self._makePage(layers, ver, pageNum)
 
+  def highlights(self, pageRange=None):
+    highlights = []
+    pageCount = self.pageCount or 0
+    pages = self.pages
+    if pages is None:
+      pages = range(0, pageCount)
+    else:
+      pageCount = max(pageCount, len(pages))
+    if pageRange is None:
+      pageRange = range(0, pageCount)
+    elif isinstance(pageRange, int):
+      pageRange = range(pageRange, pageRange+1)
+    for i in pageRange:
+      pid = pages[i]
+      if self.fsource.exists(self.uid + '.highlights', pid, ext='json'):
+        hfile = self.fsource.retrieve(self.uid + '.highlights', pid, ext='json')
+        try:
+          with open(hfile, 'r') as f:
+            h = json.load(f)
+        except Exception:
+          pass
+        else:
+          h['pageNum'] = i+1
+          h['pageId'] = pid
+          highlights.append(h)
+    return highlights
+
   def _makePage(self, layers, version, pageNum):
     return Page(layers, version, pageNum, document=self)
 
@@ -542,7 +569,7 @@ class RemarkableIndex:
       uid = self.matchId(uid)
     if uid in self.index:
       return self.index[uid]
-    elif uid ==TRASH_ID:
+    elif uid == TRASH_ID:
       return self.trash
     else:
       raise RemarkableError("Uid %s not found!" % uid)

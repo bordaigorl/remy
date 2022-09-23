@@ -10,6 +10,7 @@ from remy.gui.notebookview import *
 from remy.utils import log
 
 from remy.gui.export import webUIExport, exportDocument
+from remy.gui.highlights import *
 from remy.gui.browser.info import InfoPanel
 from remy.gui.browser.doctree import *
 from remy.gui.browser.workers import *
@@ -35,6 +36,11 @@ class Actions:
     self.export = QAction('Export...', parent)
     self.export.setShortcut(QKeySequence.Save)
     self.export.setIcon(QIcon(":assets/16/export.svg"))
+    #
+    # anything
+    self.exportHighlights = QAction('Export highlights...', parent)
+    self.exportHighlights.setShortcut("Ctrl+H")
+    self.exportHighlights.setIcon(QIcon(":assets/16/highlight.svg"))
     #
     # if single folder
     self.upload = QAction('&Upload Here...', parent)
@@ -136,6 +142,7 @@ class Actions:
     self.openBaseDoc.setEnabled(singleSel and isinstance(e, Document) and e.hasBaseDocument())
     # self.export.setEnabled(not (empty or anyFolders)) # once implemented
     self.export.setEnabled(singleSel and not anyFolders)
+    self.exportHighlights.setEnabled(not empty)
     self.upload.setEnabled(empty or (singleSel and allFolders and not anyDeleted))
     self.rename.setEnabled(singleSel)
     self.addToPinned.setEnabled(anyUnpinned and not anyDeleted)
@@ -156,6 +163,7 @@ class Actions:
       self.SEPARATOR,
       self.upload,
       self.export,
+      self.exportHighlights,
       self.SEPARATOR,
       self.delete,
       self.SEPARATOR,
@@ -187,6 +195,7 @@ class Actions:
       self.SEPARATOR,
       self.upload,
       self.export,
+      self.exportHighlights,
     ]
 
   def actionsDict(self):
@@ -297,6 +306,7 @@ class FileBrowser(QMainWindow):
     a.preview.triggered.connect(self.openSelected)
     a.openBaseDoc.triggered.connect(self.openBaseDoc)
     a.export.triggered.connect(self.exportSelected)
+    a.exportHighlights.triggered.connect(self.exportHighlightsSelected)
     a.newFolder.triggered.connect(self.newFolder)
     a.newFolderWith.triggered.connect(self.newFolderWith)
     a.rename.triggered.connect(self.editCurrent)
@@ -437,6 +447,11 @@ class FileBrowser(QMainWindow):
     entry = self.currentView().currentEntry()
     if entry:
       exportDocument(entry, self)
+
+  @pyqtSlot()
+  def exportHighlightsSelected(self):
+    w = HighlightsViewer(self.currentView().selectedEntries(), parent=self)
+    w.show()
 
   @pyqtSlot()
   def editCurrent(self):

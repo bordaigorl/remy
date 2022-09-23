@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="16" height="16" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+ <defs>
+  <linearGradient id="b" x1="16.05" x2="19.999" y1="11.109" y2="14.772" gradientUnits="userSpaceOnUse">
+   <stop stop-color="#fce94f" offset="0"/>
+   <stop stop-color="#d7b031" offset="1"/>
+  </linearGradient>
+  <radialGradient id="a" cx="16.312" cy="20.938" r="6.125" gradientTransform="matrix(1 0 0 .17347 0 17.305)" gradientUnits="userSpaceOnUse">
+   <stop offset="0"/>
+   <stop stop-opacity="0" offset="1"/>
+  </radialGradient>
+ </defs>
+ <g transform="matrix(.98231 0 0 .98231 -7.8499 -6.1381)">
+  <path d="m12 15 4 4 7-7c0.61185-0.50388 0-1 0-1l-3-3s-0.46013-0.53987-1 0z" fill="none" stroke="#bf830a" stroke-linejoin="round" stroke-width="2"/>
+  <path d="m12 15 4 4 7-7c0.68384-0.50388 0-1 0-1l-3-3s-0.49612-0.57586-1 0z" fill="url(#b)" fill-rule="evenodd"/>
+  <path d="m12 15v2l2 2h2z" fill="none" stroke="#838383" stroke-linejoin="round" stroke-width="2"/>
+  <path d="m12 15v2l2 2h2z" fill="#cecece" fill-rule="evenodd"/>
+  <path d="m9 21h2l1-1-1-1z" fill="none" stroke="#bf830a" stroke-linejoin="round" stroke-width="2"/>
+  <path d="m11.75 18.094-0.75 0.90625 1 1 0.84375-0.65625z" fill="none" stroke="#838383" stroke-width="2"/>
+  <g>
+   <ellipse cx="16.312" cy="20.938" rx="6.125" ry="1.0625" fill="url(#a)" opacity=".1"/>
+   <path d="m11.75 18.094-0.75 0.90625 1 1 0.84375-0.65625z" fill="#cecece" fill-rule="evenodd"/>
+   <path d="m9 21h2l1-1-1-1z" fill="#fce94f" fill-rule="evenodd"/>
+  </g>
+  <g fill="none" stroke-linecap="round" stroke-width="1px">
+   <path d="m13.361 14.419 6.2188-6.2187" opacity=".5" stroke="#fff"/>
+   <path d="m12.299 16.85-0.0056-1.1291" opacity=".5" stroke="#fff"/>
+   <path d="m16.548 17.678 6.2188-6.2188" opacity=".1" stroke="#000"/>
+   <path d="m14.309 18.478 0.87155 0.31616" opacity=".1" stroke="#000"/>
+  </g>
+ </g>
+</svg>
