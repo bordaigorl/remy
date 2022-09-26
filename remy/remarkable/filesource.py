@@ -272,7 +272,7 @@ class LiveFileSourceSSH(FileSource):
       found = path.isfile(cachep)
       if found:
         lstat = os.stat(cachep)
-        force = (
+        force = (force or
           (lstat.st_mtime != rstat.st_mtime) or
           (lstat.st_size != rstat.st_size)
         )
