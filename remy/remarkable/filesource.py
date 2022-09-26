@@ -103,7 +103,7 @@ class LocalFileSource(FileSource):
     if templatesRoot:
       self.templatesRoot = templatesRoot = path.expanduser(templatesRoot)
       self.templates = {}
-      with open(path.join(templatesRoot, "templates.json"), 'r') as f:
+      with open(path.join(templatesRoot, "templates.json"), 'r', encoding="utf-8") as f:
         idx = json.load(f)
       for t in idx["templates"]:
         name = t["filename"] # "name" is just for display, not for lookup!!!
@@ -219,7 +219,7 @@ class LiveFileSourceSSH(FileSource):
     if connect:
       self.scp.get( self._remote("templates.json", branch=TEMPLDIR)
                     , self._local ("templates.json", branch=TEMPLDIR) )
-      with open(self._local("templates.json", branch=TEMPLDIR), 'r') as f:
+      with open(self._local("templates.json", branch=TEMPLDIR), 'r', encoding="utf-8") as f:
         idx = json.load(f)
 
       for t in idx["templates"]:
@@ -446,7 +446,7 @@ class LiveFileSourceRsync(LiveFileSourceSSH):
       self._local (branch=TEMPLDIR),
       excludes=[])
 
-    with open(self._local("templates.json", branch=TEMPLDIR), 'r') as f:
+    with open(self._local("templates.json", branch=TEMPLDIR), 'r', encoding="utf-8") as f:
       idx = json.load(f)
 
     for t in idx["templates"]:
