@@ -86,6 +86,14 @@ class DocTreeItem(QTreeWidgetItem):
     else:
       self.setEntry(entry)
       self.idle()
+    txtbr = self.treeWidget().palette().text()
+    c = txtbr.color()
+    c.setAlpha(128)
+    txtbr.setColor(c)
+    self.setForeground(1, txtbr)
+    self.setForeground(3, txtbr)
+    self.setForeground(4, txtbr)
+    # self.setForeground(5, txtbr)
 
   def uploading(self, uid=None, etype=None, metadata=None, path=None, cancel=False):
     self._entry = None
