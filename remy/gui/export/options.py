@@ -134,6 +134,9 @@ class ExportDialog(QDialog):
     # COLOR SELECTION
     self.colorsel = PaletteSelector(palette=self.options.get('palette', 'default'))
     form.addRow("Colors:", self.colorsel)
+    
+    self.hl_below = QCheckBox("Draw highlighter below strokes")
+    form.addRow("", self.hl_below)
 
     # pencilRes = self.pencilRes = QDoubleSpinBox()
     # pencilRes.setMinimum(0)
@@ -205,6 +208,7 @@ class ExportDialog(QDialog):
     # self.white.setColor(QColor(colors.get("white", DEFAULT_COLORS[2])))
     # self.highlight.setColor(QColor(colors.get("highlight", DEFAULT_HIGHLIGHT)))
     # self.pencilRes.setValue(self.options.get("pencil_resolution", 0.4))
+    self.hl_below.setChecked(self.options.get("draw_hl_below", True))
 
     pmi = self.pencilMode.findData(self.options.get("pencil_resolution", 1))
     if pmi < 0: pmi = 0
@@ -224,6 +228,7 @@ class ExportDialog(QDialog):
         'simplify': self.tolerance.value(),
         'smoothen': self.smoothen.isChecked(),
         'palette': self.colorsel.getPalette(),
+        'draw_hl_below': self.hl_below.isChecked(),
         'exclude_layers': parseExcludeLayers(self.exclLayers.text()),
         'pencil_resolution': self.pencilMode.currentData(),
       }

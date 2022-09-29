@@ -184,6 +184,7 @@ class PageGraphicsItem(QGraphicsRectItem):
       eraser_mode=AUTO_ERASER,
       parent=None,
       progress=None,
+      draw_hl_below=True,
       exclude_layers=set(),
       exclude_tools=set()
   ):
@@ -379,6 +380,8 @@ class PageGraphicsItem(QGraphicsRectItem):
                 PathItem = QGraphicsPathItem
               item=PathItem(path, group)
               item.setPen(pen)
+              if draw_hl_below and tool == rm.HIGHLIGHTER_TOOL:
+                item.setZValue(-1)
               path = QPainterPath(path.currentPosition())
               path.setFillRule(Qt.WindingFill)
             # END STANDARD
