@@ -366,7 +366,8 @@ class FileBrowser(QMainWindow):
   def selectionChanged(self):
     v = self.currentView()
     self.actions.enableAccordingToSelection(v.selectedEntries(), v.hasPendingItems())
-    self.info.setEntry(v.currentEntry())
+    # self.info.setEntry(v.currentEntry())
+    self.info.setEntries(v.selectedEntries())
 
 
   @pyqtSlot(QTreeWidgetItem, int)

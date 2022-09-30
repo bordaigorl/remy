@@ -110,12 +110,29 @@ class Entry:
   def fullPath(self):
     return self.index.fullPathOf(self.uid)
 
-  def updatedOn(self):
+  def updatedOn(self, default="Unknown"):
     try:
       updated = arrow.get(int(self.lastModified)/1000).humanize()
     except Exception as e:
-      updated = self.lastModified or "Unknown"
+      updated = self.lastModified or default
     return updated
+
+  def openedOn(self, default="Unknown"):
+    try:
+      return arrow.get(int(self.lastOpened)/1000).humanize()
+    except Exception as e:
+      return default
+
+  def size(self):
+    if self.sizeInBytes is None: return None
+    num = int(self.sizeInBytes)
+    # https://stackoverflow.com/a/1094933/2753846
+    suffix = "B"
+    for unit in ["", "K", "M", "G", "T", "P", "E", "Z"]:
+      if abs(num) < 1024.0:
+        return f"{num:3.1f} {unit}{suffix}"
+      num /= 1024.0
+    return f"{num:.1f} Y{suffix}"
 
   def cover(self):
     c = self.get('coverPageNumber', -1, CONTENT)
@@ -123,11 +140,14 @@ class Entry:
       return self.get('lastOpenedPage', 0)
     return c
 
-  def allTags(self, including_pages=True):
-    tags = set(t["name"] for t in self.tags or [])
-    if including_pages:
-      tags |= set(t["name"] for t in self.pageTags or [])
-    return tags
+  def allDocTags(self):
+    return set(t["name"] for t in self.tags or [])
+
+  def allPageTags(self):
+    return set(t["name"] for t in self.pageTags or [])
+
+  def allTags(self):
+    return self.allDocTags() | self.allPageTags()
 
   def get(self, field, default=None, where=BOTH):
     if field in self._metadata and where & METADATA:
@@ -272,6 +292,18 @@ class Document(Entry):
         layers[j] = Layer(layers[j], layerNames[j].get("name"), highlights.get(j, []))
 
     return self._makePage(layers, ver, pageNum)
+
+  def numHighlightedPages(self):
+    i = 0
+    for _ in self.fsource.listSubItems(self.uid + '.highlights', ext='json'):
+      i += 1
+    return i
+
+  def numMarkedPages(self):
+    i = 0
+    for _ in self.fsource.listSubItems(self.uid, ext='rm'):
+      i += 1
+    return i
 
   def highlights(self, pageRange=None):
     highlights = []
