@@ -27,8 +27,12 @@ class Actions:
     ###
     self.prevPage = QAction('Previous Page', parent)
     self.prevPage.setIcon(QIcon(":assets/16/go-previous.svg"))
+    self.prevMarkedPage = QAction('Previous Marked Page', parent)
+    self.prevMarkedPage.setIcon(QIcon(":assets/16/go-marked-previous.svg"))
     self.nextPage = QAction('Next Page', parent)
     self.nextPage.setIcon(QIcon(":assets/16/go-next.svg"))
+    self.nextMarkedPage = QAction('Next Marked Page', parent)
+    self.nextMarkedPage.setIcon(QIcon(":assets/16/go-marked-next.svg"))
     self.firstPage = QAction('First Page', parent)
     self.firstPage.setIcon(QIcon(":assets/16/go-first.svg"))
     self.lastPage = QAction('Last Page', parent)
@@ -123,7 +127,9 @@ class NotebookView(QGraphicsView):
     a.rotateCW.triggered.connect(self.rotateCW)
     a.rotateCCW.triggered.connect(self.rotateCCW)
     a.prevPage.triggered.connect(self.prevPage)
+    a.prevMarkedPage.triggered.connect(self.prevMarkedPage)
     a.nextPage.triggered.connect(self.nextPage)
+    a.nextMarkedPage.triggered.connect(self.nextMarkedPage)
     a.firstPage.triggered.connect(self.firstPage)
     a.lastPage.triggered.connect(self.lastPage)
 
@@ -239,6 +245,24 @@ class NotebookView(QGraphicsView):
     if self._page > 0:
       self._loadPage(self._page - 1)
       return True
+    return False
+
+  def nextMarkedPage(self):
+    p = self._page
+    while p < self._maxPage:
+      p +=1
+      if self._document.marked(p):
+        self._loadPage(p)
+        return True
+    return False
+
+  def prevMarkedPage(self):
+    p = self._page
+    while p > 0:
+      p -=1
+      if self._document.marked(p):
+        self._loadPage(p)
+        return True
     return False
 
   # def refreshTitle(self):

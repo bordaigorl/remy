@@ -226,13 +226,16 @@ class TrashBin(Folder):
 
 class Document(Entry):
 
+  def getPageId(self, pageNum):
+    if self.pages is None:
+      return str(pageNum)
+    else:
+      return self.pages[pageNum]
+
   def getPage(self, pageNum, force=False):
     pages = self.pages
     try:
-      if pages is None:
-        pid = str(pageNum)
-      else:
-        pid = pages[pageNum]
+      pid = self.getPageId(pageNum)
       rmfile = self.fsource.retrieve(self.uid, pid, ext='rm', force=force)
       with open(rmfile, 'rb') as f:
         (ver, layers) = readLines(f)
@@ -290,6 +293,15 @@ class Document(Entry):
           h['pageId'] = pid
           highlights.append(h)
     return highlights
+
+  def marked(self, pageNum, highlights=True):
+    pid = self.getPageId(pageNum)
+    if self.fsource.exists(self.uid, pid, ext='rm'):
+      return True
+    if highlights:
+      if self.fsource.exists(self.uid + '.highlights', pid, ext='json'):
+        return True
+    return False
 
   def _makePage(self, layers, version, pageNum):
     return Page(layers, version, pageNum, document=self)
