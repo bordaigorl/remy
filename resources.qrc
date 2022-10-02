@@ -25,7 +25,9 @@
     <file>assets/16/go-first.svg</file>
     <file>assets/16/go-last.svg</file>
     <file>assets/16/go-next.svg</file>
+    <file>assets/16/go-marked-next.svg</file>
     <file>assets/16/go-previous.svg</file>
+    <file>assets/16/go-marked-previous.svg</file>
     <file>assets/16/reload.svg</file>
     <file>assets/16/rotate-ccw.svg</file>
     <file>assets/16/rotate-cw.svg</file>

@@ -51,6 +51,8 @@ class NotebookViewer(QMainWindow):
     tb.addAction(self.actionTextRec)
     tb.addSeparator()
     tb.addAction(a.firstPage)
+    if isinstance(document, PDFBasedDoc):
+      tb.addAction(a.prevMarkedPage)
     tb.addAction(a.prevPage)
     self.pageNumEdit = QLineEdit()
     self.pageNumEdit.setText("1")
@@ -60,6 +62,8 @@ class NotebookViewer(QMainWindow):
     self.pageNumEdit.editingFinished.connect(self._pageNumEdited)
     tb.addWidget(self.pageNumEdit)
     tb.addAction(a.nextPage)
+    if isinstance(document, PDFBasedDoc):
+      tb.addAction(a.nextMarkedPage)
     tb.addAction(a.lastPage)
     tb.addSeparator()
     tb.addAction(a.zoomIn)
