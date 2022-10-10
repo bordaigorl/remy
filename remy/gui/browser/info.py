@@ -144,31 +144,47 @@ class InfoPanel(QWidget):
     title = self.title = QLabel()
     tf = QFont()
     tf.setBold(True)
-    tf.setPointSize(30)
+    tf.setPointSize(18)
     title.setFont(tf)
-    details = self.details = QFormLayout()
     layout.addWidget(icon, alignment=Qt.AlignHCenter)
     # layout.addWidget(title, alignment=Qt.AlignHCenter)
     titlebox = QHBoxLayout() # this is just to disable title shrinking when wrapping text
     titlebox.addWidget(title)
     layout.addLayout(titlebox)
-    layout.addLayout(details)
-    if self.readOnly:
-      self.drop = None
-      layout.addStretch(1)
-    else:
-      drop = self.drop = DropBox()
-      drop.onFilesDropped.connect(self._onDropped)
-      layout.addWidget(drop, 1)
-    title.setMargin(10)
-    icon.setMargin(10)
+    details = self.details = QTableWidget()
+    details.setColumnCount(2)
+    details.setRowCount(10)
+    details.setShowGrid(False)
+    pal = details.palette()
+    pal.setBrush(QPalette.Base, pal.window())
+    details.setPalette(pal)
+    details.setFrameShape(QFrame.NoFrame)
+    details.verticalHeader().setVisible(False)
+    details.horizontalHeader().setVisible(False)
+    details.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
+    details.horizontalHeader().setStretchLastSection(True)
+    layout.addSpacing(20)
+    layout.addWidget(details)
+    # details = self.details = QFormLayout()
+    # layout.addLayout(details)
+    # if self.readOnly:
+    #   self.drop = None
+    #   layout.addStretch(1)
+    # else:
+    #   drop = self.drop = DropBox()
+    #   drop.onFilesDropped.connect(self._onDropped)
+    #   layout.addWidget(drop, 1)
+    # title.setMargin(10)
+    # icon.setMargin(10)
     title.setAlignment(Qt.AlignCenter)
     icon.setAlignment(Qt.AlignCenter)
-    title.setTextInteractionFlags(Qt.TextSelectableByMouse)
-    title.setWordWrap(True)
+    # title.setTextInteractionFlags(Qt.TextSelectableByMouse)
+    # title.setWordWrap(True)
     self.setDefaultInfo(title="Click on item to see metadata")
-    # title.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Minimum)
-    # title.setMaximumWidth(self.window().width() * .4)
+    ## title.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Minimum)
+    ## title.setMaximumWidth(self.window().width() * .4)
+    details.horizontalHeader().sectionResized.connect(details.resizeRowsToContents)
+    details.horizontalHeader().setMinimumSectionSize(100)
     self.setLayout(layout)
     self.setEntry()
 
@@ -178,15 +194,42 @@ class InfoPanel(QWidget):
     self.uploadRequest.emit(self.entry.uid if self.entry else '', dirs, files)
 
   def _drops(self, enabled, folders=True, action='import'):
-    if self.drop:
-      if enabled:
-        self.drop.accepting([".pdf", ".epub"], folders, action)
-      else:
-        self.drop.accepting()
+    pass
+    # if self.drop:
+    #   if enabled:
+    #     self.drop.accepting([".pdf", ".epub"], folders, action)
+    #   else:
+    #     self.drop.accepting()
+
+  def _addDetailRow(self, title, data):
+    if not data: return
+    n = self.details.rowCount()
+    self.details.setRowCount(n+1)
+    t = QTableWidgetItem(title)
+    # t.setBackground(self.palette().window())
+    fg = t.foreground()
+    cl = fg.color()
+    cl.setAlpha(128)
+    fg.setColor(cl)
+    f = QFont()
+    f.setBold(True)
+    t.setFont(f)
+    t.setForeground(fg)
+    t.setTextAlignment(Qt.AlignRight | Qt.AlignTop)
+    t.setFlags(Qt.ItemIsEnabled)
+    self.details.setItem(n, 0, t)
+    if isinstance(data, str):
+      t = QTableWidgetItem(data)
+      t.setFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable)
+      t.setTextAlignment(Qt.AlignLeft | Qt.AlignTop)
+      self.details.setItem(n, 1, t)
+    elif isinstance(data, QTableWidgetItem):
+      self.details.setItem(n, 1, data)
+    else:
+      self.details.setCellWidget(n, 1, data)
 
   def _resetDetails(self):
-    while self.details.rowCount() > 0:
-      self.details.removeRow(0)
+    self.details.setRowCount(0)
 
   def setIcon(self, pixmap):
     self.icon.setPixmap(pixmap)
@@ -212,9 +255,40 @@ class InfoPanel(QWidget):
     else:
       self.setIcon(icon)
     for (name, detail) in details:
-      self.details.addRow(name, detail)
+      self._addDetailRow(name, detail)
+
+  def setEntries(self, entries=None):
+    if entries is None or len(entries) == 0 :
+      self.setInfo(**self._defaults)
+      self.entry = None
+    elif len(entries) == 1:
+      self.setEntry(entries[0])
+    else:
+      self._resetDetails()
+      self.entry = None
+      self.setIcon(QPixmap(":assets/128/multiple-selection.svg"))
+      folders = 0
+      pdfs = 0
+      ebooks = 0
+      notebs = 0
+      for entry in entries:
+        if isinstance(entry, Folder):
+          folders += 1
+        elif isinstance(entry, PDFDoc):
+          pdfs += 1
+        elif isinstance(entry, EBook):
+          ebooks += 1
+        elif isinstance(entry, Notebook):
+          notebs += 1
+      self.title.setText("%d selected items" % len(entries))
+      if folders: self._addDetailRow("Folders", str(folders))
+      if pdfs: self._addDetailRow("PDFs", str(pdfs))
+      if ebooks: self._addDetailRow("EBooks", str(ebooks))
+      if notebs: self._addDetailRow("Notebooks", str(notebs))
+
 
   def setEntry(self, entry=None):
+    # Todo: Template
     if entry is None:
       self.setInfo(**self._defaults)
       self.entry = None
@@ -224,18 +298,31 @@ class InfoPanel(QWidget):
     self.entry = entry
     self._resetDetails()
     # DETAILS
+    self._addDetailRow("Updated", entry.updatedOn(None))
     if isinstance(entry, Folder):
-      self.details.addRow("%d" % len(entry.folders), QLabel("Folders"))
-      self.details.addRow("%d" % len(entry.files), QLabel("Files"))
+      self._addDetailRow("Folders", "%d" % len(entry.folders))
+      self._addDetailRow("Files", "%d" % len(entry.files))
     elif isinstance(entry, Document):
-      self.details.addRow("Updated", QLabel(entry.updatedOn()))
+      self._addDetailRow("Opened", entry.openedOn(None))
       if entry.pageCount:
-        self.details.addRow("Pages", QLabel("%d" % entry.pageCount))
-      uidlbl = QLabel(entry.uid)
-      uidlbl.setMinimumSize(100, uidlbl.minimumSize().height())
-      # uidlbl.setWordWrap(True)
-      uidlbl.setTextInteractionFlags(Qt.TextSelectableByMouse | Qt.TextSelectableByKeyboard)
-      self.details.addRow("UID", uidlbl)
+        if entry.originalPageCount and entry.originalPageCount > 0 and entry.pageCount - entry.originalPageCount > 0:
+          self._addDetailRow("Pages", f"{entry.pageCount} (of which {entry.pageCount - entry.originalPageCount} of notes)")
+        else:
+          self._addDetailRow("Pages", str(entry.pageCount))
+      self._addDetailRow("Size", entry.size())
+      self._addDetailRow("Marked pages", entry.numMarkedPages())
+      self._addDetailRow("Highl. pages", entry.numHighlightedPages())
+      self._addDetailRow("Orientation", entry.orientation)
+      # uidlbl = QLabel(entry.uid)
+      # uidlbl.setMinimumSize(100, uidlbl.minimumSize().height())
+      # # uidlbl.setWordWrap(True)
+      # uidlbl.setTextInteractionFlags(Qt.TextSelectableByMouse | Qt.TextSelectableByKeyboard)
+
+    if isinstance(entry, PDFBasedDoc):
+      if entry.documentMetadata:
+        self._addDetailRow("Title", entry.documentMetadata.get("title"))
+        self._addDetailRow("Authors", ','.join(entry.documentMetadata.get("authors", [])))
+        self._addDetailRow("Publisher", entry.documentMetadata.get("publisher"))
 
     # ICONS & TITLE
     if isinstance(entry, RootFolder):
@@ -275,5 +362,32 @@ class InfoPanel(QWidget):
         tgen = ThumbnailWorker(self.index, entry.uid, THUMB_HEIGHT)
         tgen.signals.thumbReady.connect(self._onThumb)
         QThreadPool.globalInstance().start(tgen)
+
+    # for k in entry._metadata:
+    #   self._addDetailRow(k, str(entry._metadata[k]))
+    # for k in entry._content:
+    #   self._addDetailRow(k, str(entry._content[k]))
+
+    tags = entry.allDocTags()
+    if tags:
+      taglist = QListWidget()
+      for tag in tags:
+        i = QListWidgetItem(tag)
+        i.setIcon(QIcon(":assets/16/tag.svg"))
+        taglist.addItem(i)
+      taglist.setFrameShape(QFrame.NoFrame)
+      self._addDetailRow("Tags", taglist)
+
+    tags = entry.allPageTags()
+    if tags:
+      taglist = QListWidget()
+      for tag in tags:
+        i = QListWidgetItem(tag)
+        i.setIcon(QIcon(":assets/16/tag.svg"))
+        taglist.addItem(i)
+      taglist.setFrameShape(QFrame.NoFrame)
+      self._addDetailRow("Page Tags", taglist)
+
+    self._addDetailRow("UID", entry.uid)
 
 InfoPanel.thumbs = {}
