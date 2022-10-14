@@ -153,7 +153,7 @@ class InfoPanel(QWidget):
     layout.addLayout(titlebox)
     details = self.details = QTableWidget()
     details.setColumnCount(2)
-    details.setRowCount(10)
+    details.setRowCount(0)
     details.setShowGrid(False)
     pal = details.palette()
     pal.setBrush(QPalette.Base, pal.window())
@@ -161,7 +161,6 @@ class InfoPanel(QWidget):
     details.setFrameShape(QFrame.NoFrame)
     details.verticalHeader().setVisible(False)
     details.horizontalHeader().setVisible(False)
-    details.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
     details.horizontalHeader().setStretchLastSection(True)
     layout.addSpacing(20)
     layout.addWidget(details)
@@ -183,7 +182,6 @@ class InfoPanel(QWidget):
     self.setDefaultInfo(title="Click on item to see metadata")
     ## title.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Minimum)
     ## title.setMaximumWidth(self.window().width() * .4)
-    details.horizontalHeader().sectionResized.connect(details.resizeRowsToContents)
     details.horizontalHeader().setMinimumSectionSize(100)
     self.setLayout(layout)
     self.setEntry()
@@ -206,15 +204,9 @@ class InfoPanel(QWidget):
     n = self.details.rowCount()
     self.details.setRowCount(n+1)
     t = QTableWidgetItem(title)
-    # t.setBackground(self.palette().window())
-    fg = t.foreground()
-    cl = fg.color()
-    cl.setAlpha(128)
-    fg.setColor(cl)
     f = QFont()
     f.setBold(True)
     t.setFont(f)
-    t.setForeground(fg)
     t.setTextAlignment(Qt.AlignRight | Qt.AlignTop)
     t.setFlags(Qt.ItemIsEnabled)
     self.details.setItem(n, 0, t)
@@ -227,9 +219,16 @@ class InfoPanel(QWidget):
       self.details.setItem(n, 1, data)
     else:
       self.details.setCellWidget(n, 1, data)
+      self.details.verticalHeader().setSectionResizeMode(n, QHeaderView.ResizeToContents)
 
   def _resetDetails(self):
+    self.details.hide()
     self.details.setRowCount(0)
+
+  def _finalizeDetails(self):
+    self.details.resizeColumnToContents(0)
+    self.details.resizeRowsToContents()
+    self.details.show()
 
   def setIcon(self, pixmap):
     self.icon.setPixmap(pixmap)
@@ -256,6 +255,7 @@ class InfoPanel(QWidget):
       self.setIcon(icon)
     for (name, detail) in details:
       self._addDetailRow(name, detail)
+    self._finalizeDetails()
 
   def setEntries(self, entries=None):
     if entries is None or len(entries) == 0 :
@@ -285,7 +285,7 @@ class InfoPanel(QWidget):
       if pdfs: self._addDetailRow("PDFs", str(pdfs))
       if ebooks: self._addDetailRow("EBooks", str(ebooks))
       if notebs: self._addDetailRow("Notebooks", str(notebs))
-
+      self._finalizeDetails()
 
   def setEntry(self, entry=None):
     # Todo: Template
@@ -310,13 +310,11 @@ class InfoPanel(QWidget):
         else:
           self._addDetailRow("Pages", str(entry.pageCount))
       self._addDetailRow("Size", entry.size())
-      self._addDetailRow("Marked pages", entry.numMarkedPages())
-      self._addDetailRow("Highl. pages", entry.numHighlightedPages())
+      np = entry.numMarkedPages()
+      if np: self._addDetailRow("Marked pages", str(np))
+      np = entry.numHighlightedPages()
+      if np: self._addDetailRow("Highl. pages", str(np))
       self._addDetailRow("Orientation", entry.orientation)
-      # uidlbl = QLabel(entry.uid)
-      # uidlbl.setMinimumSize(100, uidlbl.minimumSize().height())
-      # # uidlbl.setWordWrap(True)
-      # uidlbl.setTextInteractionFlags(Qt.TextSelectableByMouse | Qt.TextSelectableByKeyboard)
 
     if isinstance(entry, PDFBasedDoc):
       if entry.documentMetadata:
@@ -363,31 +361,37 @@ class InfoPanel(QWidget):
         tgen.signals.thumbReady.connect(self._onThumb)
         QThreadPool.globalInstance().start(tgen)
 
-    # for k in entry._metadata:
-    #   self._addDetailRow(k, str(entry._metadata[k]))
-    # for k in entry._content:
-    #   self._addDetailRow(k, str(entry._content[k]))
-
     tags = entry.allDocTags()
     if tags:
       taglist = QListWidget()
-      for tag in tags:
+      taglist.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Minimum)
+      for row, tag in enumerate(tags):
         i = QListWidgetItem(tag)
         i.setIcon(QIcon(":assets/16/tag.svg"))
         taglist.addItem(i)
       taglist.setFrameShape(QFrame.NoFrame)
+      h = taglist.visualRect(taglist.model().index(taglist.model().rowCount() - 1, 0)).bottom()+4
+      h -= taglist.visualRect(taglist.model().index(0, 0)).top()
+      taglist.setMaximumHeight(h)
       self._addDetailRow("Tags", taglist)
 
     tags = entry.allPageTags()
     if tags:
       taglist = QListWidget()
+      taglist.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Minimum)
       for tag in tags:
         i = QListWidgetItem(tag)
         i.setIcon(QIcon(":assets/16/tag.svg"))
         taglist.addItem(i)
       taglist.setFrameShape(QFrame.NoFrame)
+      h = taglist.visualRect(taglist.model().index(taglist.model().rowCount() - 1, 0)).bottom()+4
+      h -= taglist.visualRect(taglist.model().index(0, 0)).top()
+      taglist.setMaximumHeight(h)
       self._addDetailRow("Page Tags", taglist)
 
     self._addDetailRow("UID", entry.uid)
+
+    self._finalizeDetails()
+
 
 InfoPanel.thumbs = {}

@@ -295,13 +295,13 @@ class Document(Entry):
 
   def numHighlightedPages(self):
     i = 0
-    for _ in self.fsource.listSubItems(self.uid + '.highlights', ext='json'):
+    for _ in self.fsource.listSubItems(self.uid + '.highlights', ext='.json'):
       i += 1
     return i
 
   def numMarkedPages(self):
     i = 0
-    for _ in self.fsource.listSubItems(self.uid, ext='rm'):
+    for _ in self.fsource.listSubItems(self.uid, ext='.rm'):
       i += 1
     return i
 
