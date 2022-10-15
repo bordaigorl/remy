@@ -310,13 +310,13 @@ class InfoPanel(QWidget):
         else:
           self._addDetailRow("Pages", str(entry.pageCount))
       self._addDetailRow("Size", entry.size())
+      self._addDetailRow("Orientation", entry.orientation)
+
+    if isinstance(entry, PDFBasedDoc):
       np = entry.numMarkedPages()
       if np: self._addDetailRow("Marked pages", str(np))
       np = entry.numHighlightedPages()
       if np: self._addDetailRow("Highl. pages", str(np))
-      self._addDetailRow("Orientation", entry.orientation)
-
-    if isinstance(entry, PDFBasedDoc):
       if entry.documentMetadata:
         self._addDetailRow("Title", entry.documentMetadata.get("title"))
         self._addDetailRow("Authors", ','.join(entry.documentMetadata.get("authors", [])))
