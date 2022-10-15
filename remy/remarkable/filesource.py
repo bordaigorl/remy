@@ -153,6 +153,7 @@ class LocalFileSource(FileSource):
 
   def listSubItems(self, uid, ext=".rm"):
     folder = path.join(self.root, uid)
+    if not ext.startswith('.'): ext = '.' + ext
     if path.isdir(folder):
       with os.scandir(folder) as entries:
         for entry in entries:
@@ -338,19 +339,20 @@ class LiveFileSourceSSH(FileSource):
             self._allUids.append(name[0])
     return self._allUids
 
-  def listSubItems(self, uid, ext="rm"):
+  def listSubItems(self, uid, ext=".rm"):
     folder = self._remote(uid)
-    ext = '.' + ext
+    if not ext.startswith('.'): ext = '.' + ext
     try:
+      # I don't want to yield while holding a lock
       items = []
       with self._lock:
         for entry in self.sftp.listdir(folder):
           name = path.splitext(entry)
           if name[1] == ext:
             items.append(name[0])
-      return items
+      yield from items
     except Exception as e:
-      return
+      yield from []
 
   def upload(self, local, *remote, progress=None, overwrite=False):
     with self._lock:
