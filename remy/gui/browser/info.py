@@ -322,6 +322,8 @@ class InfoPanel(QWidget):
         self._addDetailRow("Authors", ','.join(entry.documentMetadata.get("authors", [])))
         self._addDetailRow("Publisher", entry.documentMetadata.get("publisher"))
 
+    self._addDetailRow("Path", entry.fullPath())
+
     # ICONS & TITLE
     if isinstance(entry, RootFolder):
       self._drops(True)
