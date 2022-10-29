@@ -479,8 +479,15 @@ class LiveFileSourceRsync(LiveFileSourceSSH):
       with subprocess.Popen(cmd, stdout=subprocess.PIPE) as p:
         for l in p.stdout:
           progress(0,0,"Synching "+l.decode().strip())
+        p.wait()
+      ret = p.returncode
     else:
-      return subprocess.run(cmd)
+      p = subprocess.run(cmd)
+      ret = p.returncode
+    log.debug("RSYNC returned %s", ret)
+    if ret != 0:
+      # TODO: would be nicer to capture stderr
+      raise Exception("Could not invoke rsync correctly, check your configuration")
 
   def _file_download(self, fr, to):
     dirname = path.dirname(to)
