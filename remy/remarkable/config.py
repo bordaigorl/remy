@@ -173,13 +173,12 @@ class RemyConfig():
   def mathpix(self):
     return self.renderOptionsFrom('mathpix')
 
-  def upload(self, path=''):
+  def upload(self, ext=None):
     upload = self.get('upload')
     opt = deepcopy(upload.get('default_options'))
-    if path+'_options' not in upload:
-      path = Path(path).suffix.lstrip('.').lower()
-    if path:
-      deepupdate(opt, upload.get(path+'_options', {}))
+    if isinstance(ext, str):
+      ext = ext.lstrip('.').lower()
+      deepupdate(opt, upload.get(ext+'_options', {}))
     return opt
 
   @property
