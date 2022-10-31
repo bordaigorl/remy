@@ -17,6 +17,8 @@ from remy.gui.browser.workers import *
 from remy.gui.browser.search import *
 from remy.gui.browser.folderselect import *
 
+from pathlib import Path
+
 # I could have used QWidget.addAction to attach these to the tree/main window
 # but this way I get a bit more flexibility
 class Actions:
@@ -220,16 +222,12 @@ class FileBrowser(QMainWindow):
     central.addWidget(results)
 
     info = self.info = InfoPanel(index, splitter)
-    info.uploadRequest.connect(self._requestUpload)
-
-    # @pyqtSlot(QModelIndex,QModelIndex)
-    # def onsel(cur, prev):
-    #   info.setText(cur.internalPointer())
 
     tree.itemActivated.connect(self.openEntry)
     tree.currentItemChanged.connect(self.treeCurrentChanged)
     self.tree.itemSelectionChanged.connect(self.selectionChanged)
     tree.contextMenu.connect(self.contextMenu)
+    tree.uploadRequest.connect(self._requestUpload)
     # tree.selectionCleared.connect(self.selClear)
 
     # results.selected.connect(self.resultSelected)
@@ -381,12 +379,13 @@ class FileBrowser(QMainWindow):
       else:
         item.setText(0, entry.name())
 
-  @pyqtSlot(str, list,list)
-  def _requestUpload(self, p, dirs, files):
+  @pyqtSlot(str, list)
+  def _requestUpload(self, p, files):
     e = self.index.get(p)
     for doc in files:
+      if not isinstance(doc, Path): doc = Path(doc)
       log.info("Uploading %s to %s", doc, e.visibleName if e else "root")
-      cont = QApplication.instance().config.upload(doc)
+      cont = QApplication.instance().config.upload(doc.suffix)
       UploadWorker(self.index, path=doc, parent=p, content=cont).start()
 
   # @pyqtSlot()
@@ -468,7 +467,7 @@ class FileBrowser(QMainWindow):
     if entry and not entry.index.isReadOnly():
       filenames, ok = QFileDialog.getOpenFileNames(self, "Select files to import")
       if ok and filenames:
-        self._requestUpload(entry.uid, [], filenames)
+        self._requestUpload(entry.uid, filenames)
 
   @pyqtSlot()
   def newFolder(self):

@@ -219,6 +219,7 @@ class DocTreeItem(QTreeWidgetItem):
       self.setText(2, "")
     else:
       # flags |= Qt.ItemIsDropEnabled | Qt.ItemIsDragEnabled
+      flags |= Qt.ItemIsDropEnabled
       if not entry.index.isReadOnly() and not entry.isDeleted():
         flags |= Qt.ItemIsEditable
       self.setText(0, entry.visibleName)
@@ -247,6 +248,7 @@ DocTreeItem.ERROR = 2
 class DocTree(QTreeWidget):
 
   contextMenu = pyqtSignal(QTreeWidgetItem,QContextMenuEvent)
+  uploadRequest = pyqtSignal(str, list)
 
   def __init__(self, index, *a, uid=None, show_trash=True, **kw):
     super(DocTree, self).__init__(*a, **kw)
@@ -271,8 +273,10 @@ class DocTree(QTreeWidget):
 
     self.setEditTriggers(self.SelectedClicked | self.EditKeyPressed)
     self.setSelectionMode(self.ExtendedSelection)
-    self.setDragDropMode(self.InternalMove)
-    self.setDragEnabled(not index.isReadOnly())
+    # self.setDragDropMode(self.DropOnly)
+    # self.setDragEnabled(not index.isReadOnly())
+    self.setAcceptDrops(not index.isReadOnly())
+    self.setDropIndicatorShown(True)
 
     index.signals.newEntryPrepare.connect(self.newEntryPrepare)
     index.signals.newEntryProgress.connect(self.newEntryProgress)
@@ -460,3 +464,55 @@ class DocTree(QTreeWidget):
       if item.status() != DocTreeItem.OK:
         return True
     return False
+
+  def dropMimeData(self, parent, idx, data, action):
+    if data.hasUrls():
+      entry = parent.entry()
+      self.uploadRequest.emit(entry.uid if entry else '', self._importablePaths(data.urls()))
+      return True
+    return False
+
+  def mimeTypes(self):
+    return ["text/uri-list"]
+
+  def supportedDropActions(self):
+    return Qt.CopyAction
+
+  _dropTargetItem = None
+  def _expandDropTarget(self, expected):
+    if self._dropTargetItem and self._dropTargetItem == expected:
+      self._dropTargetItem.setExpanded(True)
+
+  def _importablePaths(self, urls):
+    paths = []
+    for url in urls:
+      filename = url.toLocalFile()
+      if filename:
+        p = Path(filename)
+        if p.suffix.lower() in ['.pdf', '.epub']:
+          paths.append(p)
+        else:
+          return None
+      else:
+        return None
+    return paths
+
+  def dragEnterEvent(self, event):
+    paths = self._importablePaths(event.mimeData().urls())
+    if paths is None:
+      event.ignore()
+    else:
+      return super().dragEnterEvent(event)
+
+  def dragMoveEvent(self, event):
+    i = self.indexAt(event.pos())
+    if i.isValid() and i.column() != 0:
+      event.ignore()
+      return
+    i = self._dropTargetItem = self.itemAt(event.pos())
+    QTimer.singleShot(1500, lambda: self._expandDropTarget(i))
+    super().dragMoveEvent(event)
+
+  def dragLeaveEvent(self, event):
+    self._dropTargetItem = None
+    super().dragLeaveEvent(event)
