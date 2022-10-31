@@ -70,6 +70,8 @@ class _PDFBase():
   def _page(self, i):
     return self._originalPage(self.originalPageNum(i))
 
+  def pageCount(self):
+    return 0
 
 
 if RENDERER == MUPDF:
@@ -114,6 +116,10 @@ if RENDERER == MUPDF:
                         pix.stride, # length of one image line in bytes
                         QImage.Format_RGB888)
       return QImage()
+
+    def pageCount(self):
+      pdf = self._pdf()
+      return len(pdf) if pdf else 0
 
 
 elif RENDERER == POPPLER:
@@ -165,6 +171,13 @@ elif RENDERER == POPPLER:
             else:
               return page.renderToImage(xres, yres, -1,-1,-1,-1, page.Rotate270)
       return QImage()
+
+    def pageCount(self):
+      pdf = self._pdf()
+      if pdf:
+        with self.lock:
+          return pdf.numPages()
+      return 0
 
 else:
 

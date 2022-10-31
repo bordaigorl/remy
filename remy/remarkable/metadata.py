@@ -293,6 +293,14 @@ class Document(Entry):
 
     return self._makePage(layers, ver, pageNum)
 
+  def _fallbackPageCount(self):
+    return 0
+
+  def totalPageCount(self):
+    if self.pageCount: return self.pageCount
+    if self.pages: return len(self.pages)
+    return self._fallbackPageCount()
+
   def numHighlightedPages(self):
     i = 0
     for _ in self.fsource.listSubItems(self.uid + '.highlights', ext='.json'):
@@ -442,6 +450,9 @@ class PDFBasedDoc(Document):
 
   def originalName(self):
     return self.uid + '.pdf'
+
+  def _fallbackPageCount(self):
+    return self._pdf.pageCount()
 
 
 class PDFDoc(PDFBasedDoc):

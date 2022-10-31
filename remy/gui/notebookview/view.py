@@ -105,7 +105,7 @@ class NotebookView(QGraphicsView):
     self._page = 0
     self._templates = {}
     # we only support pdfs for the forseable future
-    self._maxPage = document.pageCount - 1
+    self._maxPage = document.totalPageCount() - 1
     # if isinstance(document, PDFDoc):
     #   self._maxPage = document.baseDocument().numPages() - 1
     self._loadPage(document.lastOpenedPage or 0)
