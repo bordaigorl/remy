@@ -923,13 +923,13 @@ class RemarkableIndex:
       if not uid:
         uid = self.reserveUid()
       path = Path(path)
-      ext = path.suffix
-      if ext.lower() == ".pdf":
+      ext = path.suffix.lower()
+      if ext == ".pdf":
         etype = PDF
-      elif ext.lower() == ".epub":
+      elif ext == ".epub":
         etype = EPUB
       else:
-        raise RemarkableError("Can only upload PDF and EPUB files, but was given a %s" % ext.upper())
+        raise RemarkableError("Can only upload PDF and EPUB files, but was given a %s" % ext)
 
       log.info("Preparing creation of %s", uid)
       self._new_entry_prepare(uid, etype, metadata, path)
