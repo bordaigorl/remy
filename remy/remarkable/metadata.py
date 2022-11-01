@@ -912,7 +912,7 @@ class RemarkableIndex:
       p(2)
 
       self.index[uid] = d = Folder(self, uid, meta, {})
-      self.index[d.parent].files.append(uid)
+      self.index[d.parent].folders.append(uid)
       self._reservedUids.discard(uid)
 
       self._new_entry_complete(uid, FOLDER, metadata)
