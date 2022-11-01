@@ -120,6 +120,7 @@ def connect(address='10.11.99.1', username='root', password=None, key=None, time
     raise TimeoutException("Timeout reached, please check your remarkable is connected and retry.")
   except Exception as e:
     log.error("Could not connect to %s: %s", address, e)
+    if not hasattr(e, 'hostname'): setattr(e, 'hostname', address)
     raise e
   try:
     if known_hosts and known_hosts.is_file():

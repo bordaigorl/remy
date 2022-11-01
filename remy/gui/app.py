@@ -149,7 +149,24 @@ class RemyApp(QApplication):
     mbox = QMessageBox(QMessageBox.NoIcon, 'Connection error', "Connection attempt failed")
     mbox.addButton("Settings…", QMessageBox.ResetRole)
     mbox.addButton(QMessageBox.Cancel)
-    if isinstance(e, BadHostKeyException):
+    if isinstance(e, EOFError):
+      mbox.setIconPixmap(_mkIcon(":/assets/128/security-low.svg"))
+      mbox.setDetailedText(str(e))
+      mbox.setInformativeText(
+        "<big>The host at %s abruptly refused connection.<br>"
+        "This may happen just after a software update on the tablet.<br>"
+        "It may be possible to fix this by resetting the known hosts keys.</big><br><br>"
+        "You have two options to do this:"
+        "<ol><li>"
+        "Press 'Reset key' to reset Remy's internal keys."
+        "<br></li><li>"
+        "Change your <code>~/.ssh/known_hosts</code> file to match the new fingerprint.<br>"
+        "The easiest way to do this is connecting manually via ssh and follow the instructions."
+        "<br></li></ol>" % (e.hostname)
+      )
+      mbox.addButton("Ignore", QMessageBox.NoRole)
+      mbox.addButton("Reset keys", QMessageBox.YesRole)
+    elif isinstance(e, BadHostKeyException):
       mbox.setIconPixmap(_mkIcon(":/assets/128/security-low.svg"))
       mbox.setDetailedText(str(e))
       mbox.setInformativeText(
@@ -164,7 +181,7 @@ class RemyApp(QApplication):
         "<br></li><li>"
         "Set <code>\"host_key_policy\": \"ignore_new\"</code> in the appropriate source of Remy\'s settings.<br>"
         "This is not recommended unless you are in a trusted network."
-        "<br></li><ol>" % (e.hostname)
+        "<br></li></ol>" % (e.hostname)
       )
       mbox.addButton("Ignore", QMessageBox.NoRole)
       mbox.addButton("Update", QMessageBox.YesRole)
@@ -183,7 +200,7 @@ class RemyApp(QApplication):
         "<br></li><li>"
         "Set <code>\"host_key_policy\": \"ignore_new\"</code> in the appropriate source of Remy\'s settings.<br>"
         "This is not recommended unless you are in a trusted network."
-        "<br></li><ol>" % (e.hostname)
+        "<br></li></ol>" % (e.hostname)
       )
       mbox.addButton("Ignore", QMessageBox.NoRole)
       mbox.addButton("Add", QMessageBox.YesRole)
@@ -214,7 +231,10 @@ class RemyApp(QApplication):
         open(local_kh, 'a').close()
       from paramiko import HostKeys
       hk = HostKeys(local_kh)
-      hk.add(e.hostname, e.key.get_name(), e.key)
+      if hasattr(e, 'key'):
+        hk.add(e.hostname, e.key.get_name(), e.key)
+      else:
+        hk.clear()
       hk.save(local_kh)
       log.info("Saved host key in %s", local_kh)
       self.requestInit()
