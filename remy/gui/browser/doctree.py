@@ -415,12 +415,12 @@ class DocTree(QTreeWidget):
         pi = item.parent()
         if pi is None: pi = self.invisibleRootItem()
         i = pi.indexOfChild(item)
-        if p is not None and i:
+        if p is not None and i >= 0:
           item = pi.takeChild(i)
           p.addChild(item)
         else:
           item.warning("Could not move to new parent folder. Try restarting Remy.")
-          log.error("Something when wrong in reparenting item")
+          log.error("Something went wrong in reparenting item")
       item.idle()
       self.itemSelectionChanged.emit()
 
