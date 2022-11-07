@@ -175,6 +175,7 @@ class SearchResults(QTreeView):
   entryTypes = set()
   itemSelectionChanged = pyqtSignal()
   queryChanged = pyqtSignal(str)
+  contextMenu = pyqtSignal(QContextMenuEvent)
 
   def __init__(self, index, parent=None):
     QTreeView.__init__(self, parent=parent)
@@ -184,7 +185,7 @@ class SearchResults(QTreeView):
     # self.setWindowFlags(Qt.FramelessWindowHint | Qt.Tool);
     # self.setAttribute(Qt.WA_ShowWithoutActivating)
     self.setIconSize(QSize(24,24))
-    self.setContextMenuPolicy(Qt.ActionsContextMenu)
+    # self.setContextMenuPolicy(Qt.ActionsContextMenu)
     self.setItemDelegateForColumn(1, PinnedDelegate())
     self.setSortingEnabled(True)
     self.header().setStretchLastSection(False)
@@ -244,6 +245,8 @@ class SearchResults(QTreeView):
     self.setCaseSensitivity(False)
     self.showPinnedOnly(False)
     self.showAllTypes()
+
+    self.setSelectionMode(self.ExtendedSelection)
 
   def uidOfItem(self, item):
     return self.model().data(item, Qt.UserRole)
@@ -332,6 +335,11 @@ class SearchResults(QTreeView):
   def hasPendingItems(self):
     return False
 
+  def contextMenuEvent(self, event):
+    i = self.indexAt(event.pos())
+    if i.isValid() and len(self.selectedIndexes()) == 0:
+      self.setCurrentIndex(i)
+    self.contextMenu.emit(event)
 
 
 class SearchBar(QWidget):

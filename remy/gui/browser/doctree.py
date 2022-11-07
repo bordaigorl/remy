@@ -247,7 +247,7 @@ DocTreeItem.ERROR = 2
 
 class DocTree(QTreeWidget):
 
-  contextMenu = pyqtSignal(QTreeWidgetItem,QContextMenuEvent)
+  contextMenu = pyqtSignal(QContextMenuEvent)
   uploadRequest = pyqtSignal(str, list)
 
   def __init__(self, index, *a, uid=None, show_trash=True, **kw):
@@ -360,7 +360,7 @@ class DocTree(QTreeWidget):
       item = self.invisibleRootItem()
     if len(self.selectedItems()) == 0:
       self.setCurrentItem(item)
-    self.contextMenu.emit(item, event)
+    self.contextMenu.emit(event)
 
   _pending_item = {}
 

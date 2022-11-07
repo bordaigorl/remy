@@ -225,7 +225,7 @@ class FileBrowser(QMainWindow):
 
     tree.itemActivated.connect(self.openEntry)
     tree.currentItemChanged.connect(self.treeCurrentChanged)
-    self.tree.itemSelectionChanged.connect(self.selectionChanged)
+    tree.itemSelectionChanged.connect(self.selectionChanged)
     tree.contextMenu.connect(self.contextMenu)
     tree.uploadRequest.connect(self._requestUpload)
     # tree.selectionCleared.connect(self.selClear)
@@ -257,11 +257,12 @@ class FileBrowser(QMainWindow):
     tree.itemChanged.connect(self.itemChanged)
     self.showResAct = act = QAction("Show in enclosing folder")
     act.triggered.connect(self.resultActivated)
-    results.addAction(act)
-    results.addAction(self.actions.preview)
-    results.addAction(self.actions.openBaseDoc)
-    results.addAction(self.actions.export)
+    # results.addAction(act)
+    # results.addAction(self.actions.preview)
+    # results.addAction(self.actions.openBaseDoc)
+    # results.addAction(self.actions.export)
     results.queryChanged.connect(self.searchQueryChanged)
+    results.contextMenu.connect(self.contextMenu)
 
     self.setUnifiedTitleAndToolBarOnMac(True)
     tb = QToolBar("Documents")
@@ -400,11 +401,13 @@ class FileBrowser(QMainWindow):
       self.info.setEntry(curr)
 
   # @pyqtSlot(QTreeWidgetItem,QContextMenuEvent)
-  def contextMenu(self, item, event):
+  def contextMenu(self, event):
     actions = self.actions
     # actions.enableAccordingToSelection(sel, pending)
     menu = QMenu(self)
     # maybe merge in the currentView().actions() too!
+    if isinstance(self.currentView(), SearchResults):
+      menu.addAction(self.showResAct)
     for a in actions.ctxtMenuActions():
       if a != Actions.SEPARATOR:
         if a.isEnabled():
