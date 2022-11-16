@@ -57,6 +57,7 @@ class FlatRemarkableIndexModel(QAbstractTableModel):
     self._filterPinned = QSortFilterProxyModel()
     self._filterPinned.setFilterRole(Qt.UserRole + 3)
     self._topProxy = self._filterPinned
+    self._topProxy.setSortRole(Qt.UserRole + 10)
     self.refresh()
     # self._starred = QIcon(":assets/symbolic/starred.svg")
 
@@ -89,6 +90,13 @@ class FlatRemarkableIndexModel(QAbstractTableModel):
 
     uid = self._uids[index.row()]
     entry = self._index.get(uid)
+
+    if role == Qt.UserRole + 10:
+      if index.column() != 2:
+        role = Qt.DisplayRole
+      else:
+        return -int(entry.lastModified or 0)
+
     if role == Qt.ToolTipRole:
       return self._index.fullPathOf(uid)
     elif role == Qt.ForegroundRole:

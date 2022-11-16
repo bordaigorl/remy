@@ -224,6 +224,7 @@ class DocTreeItem(QTreeWidgetItem):
         flags |= Qt.ItemIsEditable
       self.setText(0, entry.visibleName)
       self.setIcon(0, icon['folder'])
+      # self.setText(1, entry.updatedOn()) # not very useful (unrelated to contents)
       self.setText(3, "Folder")
       self.setText(2, "1" if entry.pinned else "")
     self.setFlags(flags)
@@ -238,6 +239,15 @@ class DocTreeItem(QTreeWidgetItem):
         return self._sortdata < other._sortdata
       except Exception:
         pass
+    elif self.treeWidget().sortColumn() == 1:
+      # If we had access to sort order we could
+      # always place folders first (alphabetically) regardless of sort order.
+      # But we don't so we just sort by date.
+      a = self._entry.updatedDate()
+      b = other._entry.updatedDate()
+      if a is None: return False
+      if b is None: return True
+      return a > b
     return QTreeWidgetItem.__lt__(self, other)
 
 DocTreeItem.OK = 0
