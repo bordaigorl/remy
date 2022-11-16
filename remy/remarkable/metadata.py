@@ -112,16 +112,38 @@ class Entry:
 
   def updatedOn(self, default="Unknown"):
     try:
-      updated = arrow.get(int(self.lastModified)/1000).humanize()
+      return self.updatedDate().humanize()
     except Exception as e:
-      updated = self.lastModified or default
-    return updated
+      return default
+
+  _updatedDate = None
+  def updatedDate(self):
+    if self._updatedDate is None:
+      try:
+        self._updatedDate = arrow.get(int(self.lastModified)/1000)
+      except Exception:
+        # self._updatedDate = arrow.utcnow()
+        pass
+    return self._updatedDate
+
+  def updatedFullDate(self, default="Unknown"):
+    try:
+      return self.updatedDate().format('d MMM YYYY [at] hh:mm')
+    except Exception as e:
+      return default
 
   def openedOn(self, default="Unknown"):
     try:
       return arrow.get(int(self.lastOpened)/1000).humanize()
     except Exception as e:
       return default
+
+  def openedFullDate(self, default="Unknown"):
+    try:
+      return arrow.get(int(self.lastOpened)/1000).format('d MMM YYYY [at] hh:mm')
+    except Exception as e:
+      return default
+
 
   def size(self):
     if self.sizeInBytes is None: return None

@@ -159,12 +159,12 @@ class InfoPanel(QWidget):
     self.entry = entry
     self._resetDetails()
     # DETAILS
-    self._addDetailRow("Updated", entry.updatedOn(None))
+    self._addDetailRow("Updated", entry.updatedFullDate(None))
     if isinstance(entry, Folder):
       self._addDetailRow("Folders", "%d" % len(entry.folders))
       self._addDetailRow("Files", "%d" % len(entry.files))
     elif isinstance(entry, Document):
-      self._addDetailRow("Opened", entry.openedOn(None))
+      self._addDetailRow("Opened", entry.openedFullDate(None))
       if entry.pageCount:
         if entry.originalPageCount and entry.originalPageCount > 0 and entry.pageCount - entry.originalPageCount > 0:
           self._addDetailRow("Pages", f"{entry.pageCount} (of which {entry.pageCount - entry.originalPageCount} of notes)")
