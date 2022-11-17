@@ -35,6 +35,8 @@ from remy.remarkable.metadata import RemarkableError
 
 class FlatRemarkableIndexModel(QAbstractTableModel):
 
+  _fadedColor = Qt.black
+
   def __init__(self, index):
     QAbstractListModel.__init__(self)
     self._index = index
@@ -101,7 +103,7 @@ class FlatRemarkableIndexModel(QAbstractTableModel):
       return self._index.fullPathOf(uid)
     elif role == Qt.ForegroundRole:
       if entry.isIndirectlyDeleted():
-        return QBrush(Qt.gray)
+        return self._fadedColor
     elif role == Qt.UserRole:
       return uid
     elif role == Qt.UserRole + 1:
@@ -126,7 +128,15 @@ class FlatRemarkableIndexModel(QAbstractTableModel):
       if role == Qt.DisplayRole:
         return entry.typeName().title()
 
+    if index.column() > 0 and role == Qt.ForegroundRole:
+      return self._fadedColor
+
+
     return None
+
+  def setTextColor(self, color):
+    color.setAlpha(128)
+    self._fadedColor = color
 
   def headerData(self, section, orientation, role):
     if role == Qt.DisplayRole:
@@ -188,6 +198,7 @@ class SearchResults(QTreeView):
   def __init__(self, index, parent=None):
     QTreeView.__init__(self, parent=parent)
     self._index_model = FlatRemarkableIndexModel(index)
+    self._index_model.setTextColor(self.palette().text().color())
     self.setModel(self._index_model.proxy())
     self._query = None
     # self.setWindowFlags(Qt.FramelessWindowHint | Qt.Tool);
