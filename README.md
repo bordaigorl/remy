@@ -7,6 +7,11 @@ The goal of Remy is to allow simple interaction with the reMarkable tablet over 
 
 **BEWARE**
 
+> :warning: **Remarkable Software Version 3 is NOT SUPPORTED** :warning:<br/>
+> Remy has only been tested on versions of the remarkable software <=2.
+> In particular Remy does **not** support v3 and the new v6 file format (yet).
+> See #49 for updates
+
 This is a work-in-progress with incomplete features.
 It has not been thoroughly tested.
 These instructions are preliminary and will be expanded with time.
