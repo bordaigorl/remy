@@ -477,8 +477,11 @@ class DocTree(QTreeWidget):
 
   def dropMimeData(self, parent, idx, data, action):
     if data.hasUrls():
-      entry = parent.entry()
-      self.uploadRequest.emit(entry.uid if entry else '', self._importablePaths(data.urls()))
+      if parent:
+        uid = parent.entry().uid
+      else:
+        uid = ROOT_ID
+      self.uploadRequest.emit(uid, self._importablePaths(data.urls()))
       return True
     return False
 
