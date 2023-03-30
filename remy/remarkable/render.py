@@ -268,6 +268,14 @@ class PageGraphicsItem(QGraphicsRectItem):
           else:
             pen.setColor(color)
 
+        # JOIN/CAP STYLE
+        if tool == rm.HIGHLIGHTER_TOOL:
+          pen.setCapStyle(Qt.FlatCap)
+          pen.setJoinStyle(Qt.BevelJoin)
+        else:
+          pen.setCapStyle(Qt.RoundCap)
+          pen.setJoinStyle(Qt.RoundJoin)
+
         # WIDTH CALCULATION
         if tool == rm.PENCIL_TOOL:
           if pencil_resolution > 0:
