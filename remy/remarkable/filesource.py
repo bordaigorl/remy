@@ -175,11 +175,13 @@ class LiveFileSourceSSH(FileSource):
     '/usr/share/remarkable/templates'
   )
 
+  _launcher = None
+
   _allUids = None
 
   _dirty = False
 
-  def __init__(self, ssh, id='', name="SSH", cache_dir=None, username=None, remote_documents=None, remote_templates=None, use_banner=False, connect=True, utils_path='$HOME', persist_cache=True, **kw):
+  def __init__(self, ssh, id='', name="SSH", cache_dir=None, username=None, remote_documents=None, remote_templates=None, use_banner=False, connect=True, utils_path='$HOME', persist_cache=True, launchers=["xochitl"], **kw):
     self.ssh = ssh
     self.name = name
     self.persist_cache = persist_cache
@@ -194,21 +196,30 @@ class LiveFileSourceSSH(FileSource):
       shutil.rmtree(cache_dir, ignore_errors=True)
     self._makeLocalPaths()
 
-    _,out,_ = self.ssh.exec_command("echo $HOME")
-    out.channel.recv_exit_status()
+    log.info("Supported launchers: %s", ', '.join(launchers))
+    for launcher in launchers:
+      _,out,_ = self.ssh.exec_command(f"systemctl is-active {launcher}")
+      if out.channel.recv_exit_status() == 0:
+        self._launcher = launcher
+        log.info("Detected launcher: %s", launcher)
+        break
+    if self._launcher is None:
+      log.warning("No launcher detected")
+
+
     if remote_documents:
       self.remote_roots[0] = remote_documents
     if remote_templates:
       self.remote_roots[1] = remote_templates
 
-    if use_banner:
-      self._dirty = True # force restart of xochitl even when stopping failed
-      _,out,_ = ssh.exec_command("/bin/systemctl stop xochitl")
+    if use_banner and self._launcher:
+      self._dirty = True # force restart of launcher even when stopping failed
+      _,out,_ = ssh.exec_command(f"/bin/systemctl stop {self._launcher}")
       if out.channel.recv_exit_status() == 0:
         _,out,_ = ssh.exec_command(utils_path + "/remarkable-splash '%s'" % use_banner)
         out.channel.recv_exit_status()
       else:
-        log.warning("I could not stop xochitl")
+        log.warning(f"I could not stop {self._launcher}")
 
     self.sftp = ssh.open_sftp()
     self.scp = self.sftp
@@ -324,18 +335,18 @@ class LiveFileSourceSSH(FileSource):
     if not self.persist_cache:
       log.debug("Clearing cache")
       shutil.rmtree(self.cache_dir, ignore_errors=True)
-    self.refreshXochitl()
+    self.refreshLauncher()
 
-  def refreshXochitl(self, force=False):
-    if self._dirty or force:
+  def refreshLauncher(self, force=False):
+    if self._launcher and (self._dirty or force):
       try:
-        _,out,_ = self.ssh.exec_command("/bin/systemctl restart xochitl")
+        _,out,_ = self.ssh.exec_command(f"/bin/systemctl restart {self._launcher}")
         if out.channel.recv_exit_status() == 0:
           self._dirty = False
       except paramiko.SSHException as e:
-        log.warning("Could not restart xochitl."
-                    "This is most probably due to the tablet going to sleep."
-                    "A manual reboot of the tablet is recommended.")
+        log.warning(f"Could not restart {self._launcher}."
+                     "This is most probably due to the tablet going to sleep."
+                     "A manual reboot of the tablet is recommended.")
         log.debug("SSH Error: %s", e)
 
   def listItems(self):
@@ -420,10 +431,10 @@ class LiveFileSourceRsync(LiveFileSourceSSH):
   def __init__(self, ssh, data_dir, name="Rsync",
                username="root", host="10.11.99.1", key=None,
                rsync_path=None, rsync_options=None, remote_documents=None, remote_templates=None,
-               use_banner=False, cache_mode="on_demand", known_hosts=None, host_key_policy="ask", **kw):
+               use_banner=False, cache_mode="on_demand", known_hosts=None, host_key_policy="ask", launchers=["xochitl"], **kw):
     LiveFileSourceSSH.__init__(self, ssh, name=name, cache_dir=data_dir,
                                remote_documents=remote_documents, remote_templates=remote_templates,
-                               use_banner=use_banner, connect=False)
+                               use_banner=use_banner, connect=False, launchers=launchers)
 
     log.info("DATA STORED IN:\n\t%s\n\t%s", self.local_roots[0], self.local_roots[1])
 
@@ -553,6 +564,6 @@ class LiveFileSourceRsync(LiveFileSourceSSH):
 
   def cleanup(self):
     log.debug("CLEANUP: %s", self._dirty)
-    self.refreshXochitl()
+    self.refreshLauncher()
 
 
