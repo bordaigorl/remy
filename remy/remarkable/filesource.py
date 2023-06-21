@@ -324,19 +324,26 @@ class LiveFileSourceSSH(FileSource):
     if not self.persist_cache:
       log.debug("Clearing cache")
       shutil.rmtree(self.cache_dir, ignore_errors=True)
-    self.refreshXochitl()
+    self.refreshLauncher()
 
-  def refreshXochitl(self, force=False):
-    if self._dirty or force:
-      try:
-        _,out,_ = self.ssh.exec_command("/bin/systemctl restart xochitl")
+  def refreshLauncher(self, force=False):
+    if not self._dirty and not force:
+        return
+    try:
+      for launcher in ['xochitl','tarnish','remux','draft']:
+        _,out,_ = self.ssh.exec_command("/bin/systemctl is-enabled " + launcher)
         if out.channel.recv_exit_status() == 0:
-          self._dirty = False
-      except paramiko.SSHException as e:
-        log.warning("Could not restart xochitl."
-                    "This is most probably due to the tablet going to sleep."
-                    "A manual reboot of the tablet is recommended.")
-        log.debug("SSH Error: %s", e)
+          _,out_,_ = self.ssh.exec_command("/bin/systemctl restart " + launcher)
+          if out_.channel.recv_exit_status() == 0:
+            self._dirty = False
+            # No need to check for more than one launcher
+            return
+
+    except paramiko.SSHException as e:
+      log.warning("Could not restart launcher."
+                  "This is most probably due to the tablet going to sleep."
+                  "A manual reboot of the tablet is recommended.")
+      log.debug("SSH Error: %s", e)
 
   def listItems(self):
     with self._lock:
@@ -553,6 +560,6 @@ class LiveFileSourceRsync(LiveFileSourceSSH):
 
   def cleanup(self):
     log.debug("CLEANUP: %s", self._dirty)
-    self.refreshXochitl()
+    self.refreshLauncher()
 
 
