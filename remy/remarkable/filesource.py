@@ -212,10 +212,14 @@ class LiveFileSourceSSH(FileSource):
     if remote_templates:
       self.remote_roots[1] = remote_templates
 
-    if use_banner and self._launcher:
+    if use_banner:
       self._dirty = True # force restart of launcher even when stopping failed
-      _,out,_ = ssh.exec_command(f"/bin/systemctl stop {self._launcher}")
-      if out.channel.recv_exit_status() == 0:
+      if self._launcher:
+        _,out,_ = ssh.exec_command(f"/bin/systemctl stop {self._launcher}")
+        launcher_stopped = out.channel.recv_exit_status() == 0
+      else:
+        launcher_stopped = True
+      if launcher_stopped:
         _,out,_ = ssh.exec_command(utils_path + "/remarkable-splash '%s'" % use_banner)
         out.channel.recv_exit_status()
       else:
