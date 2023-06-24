@@ -56,6 +56,8 @@ OPTIONS_DEFAULTS = {
 }
 
 
+LAUNCHERS = ["xochitl", "remux", "tarnish", "draft"]
+
 SOURCE_DEFAULTS = {
   "name": "reMarkable",
   "hidden": False,
@@ -64,6 +66,7 @@ SOURCE_DEFAULTS = {
   "username": "root",
   "host_key_policy": "ask",
   "timeout": 3,
+  "launchers": LAUNCHERS,
   "use_banner": False,
   "enable_webui_export": False
 }

@@ -10,6 +10,7 @@ from pathlib import PurePosixPath
 from threading import RLock
 
 from remy.utils import log
+from remy.remarkable.config import LAUNCHERS
 
 
 
@@ -181,7 +182,7 @@ class LiveFileSourceSSH(FileSource):
 
   _dirty = False
 
-  def __init__(self, ssh, id='', name="SSH", cache_dir=None, username=None, remote_documents=None, remote_templates=None, use_banner=False, connect=True, utils_path='$HOME', persist_cache=True, launchers=["xochitl"], **kw):
+  def __init__(self, ssh, id='', name="SSH", cache_dir=None, username=None, remote_documents=None, remote_templates=None, use_banner=False, connect=True, utils_path='$HOME', persist_cache=True, launchers=LAUNCHERS, **kw):
     self.ssh = ssh
     self.name = name
     self.persist_cache = persist_cache
@@ -196,7 +197,7 @@ class LiveFileSourceSSH(FileSource):
       shutil.rmtree(cache_dir, ignore_errors=True)
     self._makeLocalPaths()
 
-    log.info("Supported launchers: %s", ', '.join(launchers))
+    log.debug("Supported launchers: " + ', '.join(launchers))
     for launcher in launchers:
       _,out,_ = self.ssh.exec_command(f"systemctl is-active {launcher}")
       if out.channel.recv_exit_status() == 0:
@@ -435,7 +436,7 @@ class LiveFileSourceRsync(LiveFileSourceSSH):
   def __init__(self, ssh, data_dir, name="Rsync",
                username="root", host="10.11.99.1", key=None,
                rsync_path=None, rsync_options=None, remote_documents=None, remote_templates=None,
-               use_banner=False, cache_mode="on_demand", known_hosts=None, host_key_policy="ask", launchers=["xochitl"], **kw):
+               use_banner=False, cache_mode="on_demand", known_hosts=None, host_key_policy="ask", launchers=LAUNCHERS, **kw):
     LiveFileSourceSSH.__init__(self, ssh, name=name, cache_dir=data_dir,
                                remote_documents=remote_documents, remote_templates=remote_templates,
                                use_banner=use_banner, connect=False, launchers=launchers)
