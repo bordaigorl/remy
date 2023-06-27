@@ -143,6 +143,8 @@ Obviously, this source is read-only: you cannot upload PDFs to it.
   "timeout": 3,
   "persist_cache": true,
   "use_banner": "remy-banner.png"
+  "launchers": ["xochitl", "remux", "tarnish", "draft"],
+  "enable_webui_export": false
 }
 ```
 
@@ -161,6 +163,15 @@ The cache is kept across runs, and files are re-downloaded if modified date or s
 This might leave behind some files and might miss some updates.
 By setting `persist_cache` to `true` the cache is cleared every time.
 
+The `enable_webui_export` determines if Remy should include the option of using the WebUI of the reMarkable to generate exports of documents.
+This is only available if the launcher is `xochitl` and `use_banner` is false.
+
+The `launchers` option is a list of launchers that you want supported.
+Remy will detect which one is currently active using `systemctl`.
+This is useful when rebooting the launcher to ensure that the changes are picked up on the tablet.
+By default, Remy looks for `xochitl`, `remux`, `tarnish`, and `draft`.
+
+
 #### Rsync source
 
 ```json
@@ -175,7 +186,9 @@ By setting `persist_cache` to `true` the cache is cleared every time.
   "use_banner": "remy-banner.png",
   "cache_mode": "on_demand",
   "rsync_path": "/path/to/local/rsync",
-  "rsync_options": [ "--rsync-path=/opt/bin/rsync" ]
+  "rsync_options": [ "--rsync-path=/opt/bin/rsync" ],
+  "launchers": ["xochitl", "remux", "tarnish", "draft"],
+  "enable_webui_export": false
 }
 ```
 
