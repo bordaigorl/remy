@@ -1061,7 +1061,8 @@ class RemarkableIndex:
           meta = deepcopy(entry._metadata)
           metadata.setdefault('lastModified', str(arrow.utcnow().int_timestamp * 1000))
           metadata.setdefault('metadatamodified', True)
-          metadata.setdefault('version', entry.version+1)
+          if entry.version is not None:
+            metadata.setdefault('version', entry.version+1)
           deepupdate(meta, metadata)
           self.fsource.store(meta, uid + '.metadata', overwrite=True)
 
