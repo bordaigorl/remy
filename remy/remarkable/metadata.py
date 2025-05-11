@@ -699,6 +699,7 @@ class RemarkableIndex:
         p.append(TRASH_ID)
         break
       else:
+        log.error("Not in index: %s", uid)
         return None
     if not includeSelf: p = p[1:]
     if reverse: p = reversed(p)

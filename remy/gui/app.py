@@ -390,6 +390,8 @@ class RemyInitWorker(QRunnable):
         fsource.close()
       self.signals.canceled.emit()
     except Exception as e:
+      import traceback
+      traceback.print_exc()
       self.signals.error.emit(e)
 
 
