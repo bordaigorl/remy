@@ -92,7 +92,7 @@ if RENDERER == MUPDF:
     def _originalPage(self, i):
       if i is not None:
         pdf = self._pdf()
-        if pdf:
+        if pdf and i in pdf:
           return pdf[i]
       return None
 

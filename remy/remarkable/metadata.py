@@ -279,7 +279,11 @@ class Document(Entry):
     if self.pages is None:
       return str(pageNum)
     else:
-      return self.pages[pageNum]
+      p = self.pages[pageNum]
+      if isinstance(p, str):
+        return p
+      elif isinstance(p, dict):
+        return p.get("id")
 
   def getPage(self, pageNum, force=False):
     pages = self.pages
