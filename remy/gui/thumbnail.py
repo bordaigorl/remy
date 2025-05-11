@@ -32,7 +32,7 @@ class ThumbnailWorker(QRunnable):
                         pencil_resolution = 1,
                         simplify=0, smoothen=False,
                         eraser_mode=IGNORE_ERASER)
-      img = QImage(self.height * s.width() / s.height(), self.height ,QImage.Format_ARGB32)
+      img = QImage(int(self.height * s.width() / s.height()), self.height ,QImage.Format_ARGB32)
       img.fill(Qt.white)
       painter = QPainter(img)
       painter.setRenderHint(QPainter.Antialiasing)
