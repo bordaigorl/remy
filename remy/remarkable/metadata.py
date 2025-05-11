@@ -611,9 +611,9 @@ class RemarkableIndex:
         elif content["fileType"] == "epub":
           index[uid] = EBook(self, uid, metadata, content)
         else:
-          raise RemarkableDocumentError("Unknown file type '{fileType}'".format(content))
+          raise RemarkableDocumentError("Unknown file type '{fileType}'".format(**content))
       else:
-        raise RemarkableDocumentError("Unknown file type '{type}'".format(metadata))
+        raise RemarkableDocumentError("Unknown file type '{type}'".format(**metadata))
     trash = TrashBin(self)
     for k, prop in index.items():
       progress(len(uids)+j, len(uids)*2)
