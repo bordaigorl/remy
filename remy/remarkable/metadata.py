@@ -23,6 +23,7 @@ FolderNode = namedtuple('FolderNode', 'folders files')
 
 FOLDER_TYPE = "CollectionType"
 DOCUMENT_TYPE = "DocumentType"
+TEMPLATE_TYPE = "TemplateType"
 
 NOTEBOOK = 1
 PDF = 2
@@ -612,6 +613,8 @@ class RemarkableIndex:
           index[uid] = EBook(self, uid, metadata, content)
         else:
           raise RemarkableDocumentError("Unknown file type '{fileType}'".format(**content))
+      elif metadata["type"] == TEMPLATE_TYPE:
+        log.debug("IGNORING TEMPLATE: " + uid)
       else:
         raise RemarkableDocumentError("Unknown file type '{type}'".format(**metadata))
     trash = TrashBin(self)
