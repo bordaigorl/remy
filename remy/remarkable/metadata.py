@@ -584,10 +584,14 @@ class RemarkableIndex:
       progress(j, len(uids)*2)
       try:
         metadata = self._readJson(uid, ext='metadata')
-        content  = self._readJson(uid, ext='content')
       except Exception as e:
         log.warning("Could not load metadata of %s: skipping [%s]", uid, e)
         continue
+      try:
+        content  = self._readJson(uid, ext='content')
+      except Exception as e:
+        content = {}
+        log.warning("Could not load content of %s: ignoring [%s]", uid, e)
       for t in content.get("tags", []):
         if t["name"] not in tags:
           tags[t["name"]] = {
